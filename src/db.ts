@@ -3,6 +3,7 @@ import { env } from "./config.ts";
 
 export const sql = postgres(env.DATABASE_URL, {
   max: 30,
+  idle_timeout: 30,
   types: {
     numeric: {
       to: 1700,
