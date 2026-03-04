@@ -25,8 +25,8 @@ Request → Extract API key (4 methods) → Validate key in DB → Resolve geoco
 
 ### Endpoints
 
-- `GET /api/v3/product/analysis/:id` — building risk analysis
-- `GET /api/v3/product/statistics/:id` — neighborhood statistics (9 parallel queries)
+- `GET /v4/product/analysis/:id` — building risk analysis
+- `GET /v4/product/statistics/:id` — neighborhood statistics (9 parallel queries)
 - `GET /health` — health check
 
 ### Authentication

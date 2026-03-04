@@ -1,6 +1,6 @@
-# Webservice API v3 Upgrade Guide
+# Webservice API v4 Upgrade Guide
 
-This document describes the changes when migrating from the legacy C# webservice to the new webservice.
+This document describes the changes when migrating from the v3 C# webservice to the v4 webservice.
 
 ## Base URL
 
@@ -40,11 +40,16 @@ API keys no longer require the `service` role. If your key works today, it will 
 
 ## Endpoints
 
-The endpoint paths are unchanged:
+The endpoint paths have changed — the `/api` prefix is dropped and version bumped to v4:
 
 ```
+# Old
 GET /api/v3/product/analysis/{id}
 GET /api/v3/product/statistics/{id}
+
+# New
+GET /v4/product/analysis/{id}
+GET /v4/product/statistics/{id}
 ```
 
 All existing identifier formats continue to work (BAG, legacy BAG, GFM, CBS).
@@ -194,4 +199,5 @@ Municipality-level incident and report counts now work correctly. The previous w
 | Construction years as integers | `constructionYearDistribution` | Parse `yearFrom` as integer, `yearTo` removed |
 | Risk distribution as array | `foundationRiskDistribution` | Iterate array instead of reading `percentageA-E` keys |
 | New analysis fields | `enforcementTerm`, `overallQuality` | No action needed (additive) |
+| Endpoint paths changed | `/api/v3/product/*` → `/v4/product/*` | Update base URL and paths |
 | Municipality data populated | `municipalityIncidentCount`, `municipalityReportCount` | No action needed (bug fix) |

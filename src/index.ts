@@ -1,9 +1,19 @@
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { env } from "./config.ts";
+import { sql } from "./db.ts";
 import { authMiddleware } from "./auth.ts";
 import { trackerMiddleware } from "./tracker.ts";
 import productRoutes from "./routes/product.ts";
+
+const shutdown = async () => {
+  console.log("Shutting down...");
+  await sql.end({ timeout: 5 });
+  process.exit(0);
+};
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
 
 export type AppEnv = {
   Variables: {
@@ -29,8 +39,8 @@ app.onError((err, c) => {
 
 app.get("/health", (c) => c.json({ status: "ok" }));
 
-app.use("/api/v3/product/*", authMiddleware, trackerMiddleware);
-app.route("/api/v3/product", productRoutes);
+app.use("/v4/product/*", authMiddleware, trackerMiddleware);
+app.route("/v4/product", productRoutes);
 
 app.notFound((c) => c.json({ message: "Not found" }, 404));
 
