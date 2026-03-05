@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { sql } from "../db.ts";
-import { resolveBuildingExternalId, resolveGfmBuildingId, resolveNeighborhoodId } from "../geocoder.ts";
+import { resolveBuildingExternalId, resolveNeighborhoodId } from "../geocoder.ts";
 import type { AppEnv } from "../index.ts";
 
 const product = new Hono<AppEnv>();
@@ -46,15 +46,12 @@ product.get("/analysis/:id", async (c) => {
 
   if (rows.length === 0) return c.json({ message: "Not found" }, 404);
 
-  const gfmId = await resolveGfmBuildingId(externalId);
-  if (gfmId) {
-    c.set("tracker", {
-      tenantId: c.get("tenantId"),
-      product: "analysis3",
-      buildingId: gfmId,
-      identifier: id,
-    });
-  }
+  c.set("tracker", {
+    tenantId: c.get("tenantId"),
+    product: "analysis3",
+    buildingId: externalId,
+    identifier: id,
+  });
 
   return c.json(rows[0]);
 });
@@ -139,17 +136,14 @@ product.get("/statistics/:id", async (c) => {
   ]);
 
   // Track usage
-  const externalId = await resolveBuildingExternalId(id);
-  if (externalId) {
-    const gfmId = await resolveGfmBuildingId(externalId);
-    if (gfmId) {
-      c.set("tracker", {
-        tenantId: c.get("tenantId"),
-        product: "statistics3",
-        buildingId: gfmId,
-        identifier: id,
-      });
-    }
+  const buildingExternalId = await resolveBuildingExternalId(id);
+  if (buildingExternalId) {
+    c.set("tracker", {
+      tenantId: c.get("tenantId"),
+      product: "statistics3",
+      buildingId: buildingExternalId,
+      identifier: id,
+    });
   }
 
   return c.json({
