@@ -3,6 +3,10 @@
   "module": "src/index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "build": "echo 'No build step required'",
+    "start": "bun run src/index.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
