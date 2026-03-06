@@ -5,6 +5,7 @@ import { sql } from "./db.ts";
 import { authMiddleware } from "./auth.ts";
 import { trackerMiddleware } from "./tracker.ts";
 import productRoutes from "./routes/product.ts";
+import usageRoutes from "./routes/usage.ts";
 
 const shutdown = async () => {
   console.log("Shutting down...");
@@ -41,6 +42,9 @@ app.get("/health", (c) => c.json({ status: "ok" }));
 
 app.use("/v4/product/*", authMiddleware, trackerMiddleware);
 app.route("/v4/product", productRoutes);
+
+app.use("/v4/usage/*", authMiddleware);
+app.route("/v4/usage", usageRoutes);
 
 app.notFound((c) => c.json({ message: "Not found" }, 404));
 
