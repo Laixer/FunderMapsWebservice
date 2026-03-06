@@ -15,14 +15,10 @@ function extractKey(c: { req: { header: (name: string) => string | undefined; qu
   const authHeader = c.req.header("Authorization");
   if (authHeader) {
     if (authHeader.startsWith("Bearer ")) return authHeader.slice(7);
-    if (authHeader.startsWith("authkey ")) return authHeader.slice(8);
   }
 
   const apiKey = c.req.header("X-API-Key");
   if (apiKey) return apiKey;
-
-  const queryKey = c.req.query("authkey");
-  if (queryKey) return queryKey;
 
   return null;
 }
