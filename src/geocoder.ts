@@ -38,17 +38,6 @@ export async function resolveBuildingExternalId(input: string): Promise<string |
 }
 
 /**
- * Resolve a BAG external building ID to the GFM internal building ID.
- * Used for product tracking (product_tracker.building_id is geocoder.geocoder_id).
- */
-export async function resolveGfmBuildingId(externalBuildingId: string): Promise<string | null> {
-  const rows = await sql`
-    SELECT id FROM geocoder.building WHERE external_id = ${externalBuildingId} LIMIT 1
-  `;
-  return rows[0]?.id ?? null;
-}
-
-/**
  * Resolve any identifier to a GFM neighborhood ID (used by statistics tables).
  * For CBS neighborhood codes, translates external_id → internal GFM id.
  * For building identifiers, looks up via model_risk_static.
