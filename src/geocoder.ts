@@ -11,9 +11,9 @@ function detectFormat(input: string): IdFormat {
   const id = input.replaceAll(" ", "").toUpperCase();
 
   if (id.startsWith("NL.IMBAG.PAND.")) return "bag_building";
-  if (id.length === 16 && id.substring(4, 6) === "10") return "bag_legacy_building";
+  if (/^\d{4}10\d{10}$/.test(id)) return "bag_legacy_building";
   if (id.startsWith("GFM-")) return "gfm";
-  if (id.length === 10 && id.startsWith("BU")) return "cbs_neighborhood";
+  if (/^BU\d{8}$/.test(id)) return "cbs_neighborhood";
 
   return "unknown";
 }

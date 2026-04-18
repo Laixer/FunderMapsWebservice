@@ -16,7 +16,7 @@ export const trackerMiddleware = createMiddleware<AppEnv>(async (c, next) => {
         SELECT 1 FROM application.product_tracker
         WHERE organization_id = ${tracker.tenantId}
           AND product = ${tracker.product}
-          AND identifier = ${tracker.identifier}
+          AND building_id = ${tracker.buildingId}
           AND create_date > CURRENT_TIMESTAMP - interval '24 hours'
       )
     `;

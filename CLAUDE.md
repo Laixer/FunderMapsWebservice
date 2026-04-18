@@ -53,14 +53,14 @@ Not yet implemented (planned per C# v3 parity): BAG address (`NL.IMBAG.NUMMERAAN
 
 ### Product Tracking
 
-After-response middleware inserts into `application.product_tracker` with 24-hour deduplication per (organization_id, product, identifier). Tracking failures are silently caught — never breaks the response.
+After-response middleware inserts into `application.product_tracker` with 24-hour deduplication per (organization_id, product, building_id). Dedup is keyed on the resolved BAG id so that case/whitespace variants of the same identifier can't produce multiple billable rows in a 24h window. The `identifier` column preserves the raw client-supplied id for observability. Tracking failures are silently caught — never break the response.
 
 ### Key Database Tables/Views
 
 - `data.model_risk_static` — main analysis view. Keyed by `building_id` (BAG, e.g. `NL.IMBAG.PAND.*`). `neighborhood_id` column holds the GFM neighborhood id.
 - `data.statistics_product_*` — 9 statistics views (all keyed by GFM neighborhood_id or municipality_id)
 - `application.auth_key` — API keys (key + user_id)
-- `application.product_tracker` — usage tracking (building_id is GFM geocoder_id type)
+- `application.product_tracker` — usage tracking. `building_id` stores the resolved BAG id (typed `geocoder.geocoder_id`, FK to `geocoder.building.external_id`); `identifier` preserves the raw client-supplied id.
 - `geocoder.building` — id=GFM, external_id=BAG
 - `geocoder.neighborhood/district/municipality` — GFM IDs with CBS external_ids
 
@@ -69,7 +69,7 @@ After-response middleware inserts into `application.product_tracker` with 24-hou
 - `model_risk_static.building_id` = **BAG** external id (despite the unprefixed name). No `external_building_id` column exists.
 - `model_risk_static.neighborhood_id` = GFM internal id.
 - `statistics_product_*.neighborhood_id` = GFM internal id.
-- `product_tracker.building_id` = GFM internal id (FK to `geocoder.building`).
+- `product_tracker.building_id` = BAG external id (FK to `geocoder.building.external_id`).
 - `geocoder.building.id` = GFM internal id; `geocoder.building.external_id` = BAG.
 - `geocoder.neighborhood.id` = GFM internal id; `geocoder.neighborhood.external_id` = CBS `BU*` code.
 
