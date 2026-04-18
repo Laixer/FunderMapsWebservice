@@ -27,7 +27,7 @@ export async function resolveBuildingExternalId(input: string): Promise<string |
 
   switch (format) {
     case "bag_building":
-      return input;
+      return input.replaceAll(" ", "").toUpperCase();
 
     case "bag_legacy_building":
       return `NL.IMBAG.PAND.${input.replaceAll(" ", "").toUpperCase()}`;
