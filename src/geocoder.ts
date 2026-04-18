@@ -61,13 +61,12 @@ export async function resolveNeighborhoodId(input: string): Promise<string | nul
     return rows[0]?.neighborhood_id ?? null;
   }
 
-  // BAG building IDs: resolve to external_building_id, then look up neighborhood
   const externalId = await resolveBuildingExternalId(input);
   if (!externalId) return null;
 
   const rows = await sql`
     SELECT neighborhood_id FROM data.model_risk_static
-    WHERE external_building_id = ${externalId}
+    WHERE building_id = ${externalId}
     LIMIT 1
   `;
   return rows[0]?.neighborhood_id ?? null;

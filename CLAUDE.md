@@ -20,34 +20,36 @@ bun run src/index.ts # start the server (port 8080)
 ### Request Flow
 
 ```
-Request → Extract API key (4 methods) → Validate key in DB → Resolve geocoder ID → Query product data → Track usage → Respond
+Request → Extract API key (2 methods) → Validate key in DB (60s cache) → Resolve geocoder ID → Query product data → Track usage → Respond
 ```
 
 ### Endpoints
 
 - `GET /v4/product/analysis/:id` — building risk analysis
 - `GET /v4/product/statistics/:id` — neighborhood statistics (9 parallel queries)
+- `GET /v4/usage` — per-tenant request count stats (daily/monthly/total)
 - `GET /health` — health check
 
 ### Authentication
 
-API-key only. 4 delivery methods (checked in order):
+API-key only. 2 delivery methods (checked in order):
 1. `Authorization: Bearer fmsk.xxx` (preferred)
 2. `X-API-Key: fmsk.xxx`
-3. `Authorization: authkey fmsk.xxx` (legacy)
-4. `?authkey=fmsk.xxx` (legacy)
+
+Legacy `Authorization: authkey` and `?authkey=` methods were removed in commit `9485134`.
 
 No role checks. Key existence in `application.auth_key` = authorized.
-Auth query joins `auth_key → user → organization_user` in one round-trip.
+Auth query joins `auth_key → user → organization_user` in one round-trip, with a 60s in-memory cache per key (`AUTH_TTL_MS`).
 
 ### Geocoder ID Resolution
 
-The `:id` parameter accepts multiple identifier formats:
+The `:id` parameter currently supports:
 - BAG building: `NL.IMBAG.PAND.{16digits}`
-- BAG address: `NL.IMBAG.NUMMERAANDUIDING.{16digits}` → resolves to building
-- Legacy BAG: `{16digits}` with `10` at pos 4-5 (building) or `20` (address)
-- GFM: `gfm-{hex}` → looks up `external_building_id` via `model_risk_static`
-- CBS: `BU{10}` (neighborhood), `WK{8}` (district), `GM{6}` (municipality) → statistics only
+- Legacy BAG building: `{16digits}` with `10` at pos 4-5
+- GFM: `gfm-{hex}` — **statistics only** (analysis route does not resolve GFM → BAG; returns 404)
+- CBS neighborhood: `BU{8digits}` (10 chars total) — statistics only
+
+Not yet implemented (planned per C# v3 parity): BAG address (`NL.IMBAG.NUMMERAANDUIDING.*`), legacy BAG address (`20` at pos 4-5), CBS district (`WK*`), CBS municipality (`GM*`).
 
 ### Product Tracking
 
@@ -55,20 +57,21 @@ After-response middleware inserts into `application.product_tracker` with 24-hou
 
 ### Key Database Tables/Views
 
-- `data.model_risk_static` — main analysis view (building_id=GFM, external_building_id=BAG)
+- `data.model_risk_static` — main analysis view. Keyed by `building_id` (BAG, e.g. `NL.IMBAG.PAND.*`). `neighborhood_id` column holds the GFM neighborhood id.
 - `data.statistics_product_*` — 9 statistics views (all keyed by GFM neighborhood_id or municipality_id)
 - `application.auth_key` — API keys (key + user_id)
 - `application.product_tracker` — usage tracking (building_id is GFM geocoder_id type)
 - `geocoder.building` — id=GFM, external_id=BAG
 - `geocoder.neighborhood/district/municipality` — GFM IDs with CBS external_ids
 
-### Important: ID Format Mismatch
+### Important: ID Formats Across Schemas
 
-- `model_risk_static.building_id` = GFM internal ID
-- `model_risk_static.external_building_id` = BAG external ID
-- `statistics_product_*.neighborhood_id` = GFM internal ID
-- `product_tracker.building_id` = GFM internal ID (FK to geocoder.building)
-- `geocoder.building_geocoder.building_id` = BAG external ID (confusingly named)
+- `model_risk_static.building_id` = **BAG** external id (despite the unprefixed name). No `external_building_id` column exists.
+- `model_risk_static.neighborhood_id` = GFM internal id.
+- `statistics_product_*.neighborhood_id` = GFM internal id.
+- `product_tracker.building_id` = GFM internal id (FK to `geocoder.building`).
+- `geocoder.building.id` = GFM internal id; `geocoder.building.external_id` = BAG.
+- `geocoder.neighborhood.id` = GFM internal id; `geocoder.neighborhood.external_id` = CBS `BU*` code.
 
 ## File Structure
 
@@ -81,7 +84,8 @@ src/
 ├── geocoder.ts     # ID format detection + resolution functions
 ├── tracker.ts      # After-response product tracking middleware
 └── routes/
-    └── product.ts  # analysis + statistics endpoints
+    ├── product.ts  # analysis + statistics endpoints
+    └── usage.ts    # /v4/usage endpoint
 ```
 
 ## Differences from C# Webservice

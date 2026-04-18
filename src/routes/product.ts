@@ -12,7 +12,7 @@ product.get("/analysis/:id", async (c) => {
 
   const rows = await sql`
     SELECT
-      external_building_id  AS "buildingId",
+      building_id           AS "buildingId",
       neighborhood_id       AS "neighborhoodId",
       construction_year     AS "constructionYear",
       construction_year_reliability AS "constructionYearReliability",
@@ -40,7 +40,7 @@ product.get("/analysis/:id", async (c) => {
       overall_quality       AS "overallQuality",
       recovery_type         AS "recoveryType"
     FROM data.model_risk_static
-    WHERE external_building_id = ${externalId}
+    WHERE building_id = ${externalId}
     LIMIT 1
   `;
 
