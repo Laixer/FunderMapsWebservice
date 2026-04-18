@@ -46,10 +46,11 @@ Auth query joins `auth_key → user → organization_user` in one round-trip, wi
 The `:id` parameter currently supports:
 - BAG building: `NL.IMBAG.PAND.{16digits}`
 - Legacy BAG building: `{16digits}` with `10` at pos 4-5
-- GFM: `gfm-{hex}` — **statistics only** (analysis route does not resolve GFM → BAG; returns 404)
 - CBS neighborhood: `BU{8digits}` (10 chars total) — statistics only
 
 Not yet implemented (planned per C# v3 parity): BAG address (`NL.IMBAG.NUMMERAANDUIDING.*`), legacy BAG address (`20` at pos 4-5), CBS district (`WK*`), CBS municipality (`GM*`).
+
+GFM identifiers (`gfm-*`) are intentionally out of scope for v4. The `detectFormat` branch exists but the lookup path does not resolve correctly, and that is accepted — `gfm-*` inputs return 404.
 
 ### Product Tracking
 
