@@ -36,8 +36,6 @@ product.get("/analysis/:id", async (c) => {
       dewatering_depth_risk AS "dewateringDepthRisk",
       dewatering_depth_risk_reliability AS "dewateringDepthReliability",
       unclassified_risk     AS "unclassifiedRisk",
-      enforcement_term      AS "enforcementTerm",
-      overall_quality       AS "overallQuality",
       recovery_type         AS "recoveryType"
     FROM data.model_risk_static
     WHERE building_id = ${externalId}
