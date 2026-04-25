@@ -32,11 +32,9 @@ Request → Extract API key (2 methods) → Validate key in DB (60s cache) → R
 
 ### Authentication
 
-API-key only. 2 delivery methods (checked in order):
-1. `Authorization: Bearer fmsk.xxx` (preferred)
-2. `X-API-Key: fmsk.xxx`
+API-key only. Single delivery method: `Authorization: Bearer fmsk.xxx`.
 
-Legacy `Authorization: authkey` and `?authkey=` methods were removed in commit `9485134`.
+Legacy `Authorization: authkey` and `?authkey=` methods were removed in commit `9485134`. `X-API-Key` header support was removed afterwards (see MIGRATION.md).
 
 No role checks. Key existence in `application.auth_key` = authorized.
 Auth query joins `auth_key → user → organization_user` in one round-trip, with a 60s in-memory cache per key (`AUTH_TTL_MS`).

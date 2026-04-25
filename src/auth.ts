@@ -11,17 +11,11 @@ interface AuthResult {
 const AUTH_TTL_MS = 60_000;
 const cache = new Map<string, AuthResult>();
 
-function extractKey(c: { req: { header: (name: string) => string | undefined; query: (name: string) => string | undefined } }): string | null {
+function extractKey(c: { req: { header: (name: string) => string | undefined } }): string | null {
   const authHeader = c.req.header("Authorization");
   if (authHeader) {
     const match = authHeader.match(/^Bearer\s+(\S.*)$/i);
     if (match) return match[1]!.trim();
-  }
-
-  const apiKey = c.req.header("X-API-Key");
-  if (apiKey) {
-    const trimmed = apiKey.trim();
-    if (trimmed) return trimmed;
   }
 
   return null;
