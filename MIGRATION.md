@@ -4,6 +4,26 @@
 
 We're upgrading the FunderMaps webservice. You'll need to update your integration to use the new endpoints, authentication, and response format.
 
+## Test against staging before cutover
+
+The new webservice is live on a staging hostname so you can validate your integration before the production cutover:
+
+```
+https://ws-staging.fundermaps.com/v4/product/analysis/{id}
+https://ws-staging.fundermaps.com/v4/product/statistics/{id}
+```
+
+Your existing API key works on staging — same key, same Bearer header. The staging service reads the same production database, so responses are real.
+
+```bash
+curl -H "Authorization: Bearer fmsk.your_api_key" \
+  "https://ws-staging.fundermaps.com/v4/product/analysis/NL.IMBAG.PAND.1734101000021359"
+```
+
+When we cut over, the same `/v4/...` paths will be served from `ws.fundermaps.com`. Until then, `ws.fundermaps.com/v4/...` returns 404 — use the staging hostname while migrating.
+
+We'll announce the cutover date separately. After cutover, both hostnames will continue to work for a deprecation window.
+
 ## 1. Base URL & paths
 
 ```
@@ -17,6 +37,15 @@ GET https://ws.fundermaps.com/v4/product/statistics/{id}
 ```
 
 The `/api` prefix is removed and the version changes from `v3` to `v4`.
+
+### Accepted `{id}` formats
+
+| Endpoint | Accepted formats |
+|----------|------------------|
+| `/v4/product/analysis/{id}` | Full BAG (`NL.IMBAG.PAND.0599100000369041`) or 16-digit BAG (`0599100000369041`) |
+| `/v4/product/statistics/{id}` | Full BAG, 16-digit BAG, CBS neighborhood (`BU03630000`), or GFM (`gfm-...`) |
+
+Unrecognized or unresolvable IDs return `404 {"message":"Not found"}`.
 
 ## 2. Authentication
 
@@ -82,23 +111,25 @@ Note: `yearFrom` is now an integer, `yearTo` is removed, and `totalCount` is ren
 
 Note: categories with 0% are omitted from the array.
 
-## 5. New fields (no action needed)
+## 5. Removed analysis fields
 
-The analysis response includes two new optional fields:
+Two fields that existed in v3 are **not returned** in v4:
 
-- `enforcementTerm` — integer or null (years until enforcement)
-- `overallQuality` — string or null (`bad`, `mediocre_bad`, `mediocre`, `mediocre_good`, `good`)
+- `enforcementTerm`
+- `overallQuality`
 
-These are additive and can be safely ignored if you don't need them.
+Both were dropped because the underlying source column had drifted away from the documented enum semantics. If your integration depended on them, contact us before migrating.
 
 ## Quick checklist
 
+- [ ] Validate against `https://ws-staging.fundermaps.com/v4/...` before changing your production base URL
 - [ ] Update authentication: use `Authorization: Bearer fmsk.your_api_key`
 - [ ] Update base URL: drop `/api`, change `v3` to `v4`
 - [ ] Update enum parsing: integers → strings
 - [ ] Update `foundationTypeDistribution` parsing: read array directly
 - [ ] Update `constructionYearDistribution` parsing: `yearFrom` is an integer, `yearTo` removed, `totalCount` → `count`
 - [ ] Update `foundationRiskDistribution` parsing: read array of objects instead of `percentageA`–`percentageE` keys
+- [ ] Remove any reads of `enforcementTerm` / `overallQuality` from the analysis response
 
 ## Enum reference
 
@@ -109,5 +140,4 @@ These are additive and can be safely ignored if you don't need them.
 | foundationRisk | `a`, `b`, `c`, `d`, `e` |
 | damageCause | `bio_infection`, `drainage`, `construction_flaw`, `drystand`, `overcharge_negative_cling`, `negative_cling`, `overcharge`, `vegetation`, `gas`, `vibrations`, `foundation_flaw`, `partial_foundation_recovery`, `subsidence` |
 | inquiryType | `additional_research`, `architectural_research`, `demolition`, `foundation_advice`, `foundation_research`, `inspection`, `monitor`, `note`, `second_opinion`, `quick_scan`, `unknown` |
-| overallQuality | `bad`, `mediocre_bad`, `mediocre`, `mediocre_good`, `good` |
 | recoveryType | `beam_on_pile`, `pile_in_wall`, `table`, `injection`, `unknown` |
