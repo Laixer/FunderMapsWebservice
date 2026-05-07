@@ -42,8 +42,10 @@ The `/api` prefix is removed and the version changes from `v3` to `v4`.
 
 | Endpoint | Accepted formats |
 |----------|------------------|
-| `/v4/product/analysis/{id}` | Full BAG (`NL.IMBAG.PAND.0599100000369041`) or 16-digit BAG (`0599100000369041`) |
-| `/v4/product/statistics/{id}` | Full BAG, 16-digit BAG, CBS neighborhood (`BU03630000`), or GFM (`gfm-...`) |
+| `/v4/product/analysis/{id}` | BAG pand (`NL.IMBAG.PAND.0599100000369041` or 16-digit `0599100000369041`); BAG nummeraanduiding (`NL.IMBAG.NUMMERAANDUIDING.0599200000123456` or 16-/15-digit bare form) |
+| `/v4/product/statistics/{id}` | Any of the above, plus CBS neighborhood (`BU03630000`) or GFM (`gfm-...`) |
+
+Nummeraanduiding IDs are resolved to their pand before lookup. BAG address-to-building is many-to-one, so two nummeraanduidingen on the same pand return identical analysis and statistics — that's expected, the model is building-level.
 
 Unrecognized or unresolvable IDs return `404 {"message":"Not found"}`.
 
