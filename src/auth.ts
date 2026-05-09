@@ -51,6 +51,13 @@ async function resolveKey(key: string): Promise<AuthResult | null> {
 
   if (rows.length === 0) return null;
 
+  // Fire-and-forget last_used bump. Cache miss only — at most once per
+  // AUTH_TTL_MS per key, so this won't hammer the table on hot keys.
+  // Errors are non-fatal: usage tracking is observability, not auth.
+  sql`UPDATE application.auth_key SET last_used = now() WHERE key_hash = ${keyHash}`.catch(
+    () => {},
+  );
+
   const result: AuthResult = {
     userId: rows[0]!.user_id,
     tenantId: rows[0]!.organization_id,
