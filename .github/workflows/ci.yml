@@ -22,4 +22,10 @@ jobs:
         run: bun run typecheck
 
       - name: Unit tests
+        # config.ts runs envSchema.parse(process.env) at module load, so any
+        # test that transitively imports db.ts → config.ts needs DATABASE_URL
+        # set even if no test actually opens the connection. A dummy value
+        # is fine — none of the pure-function tests touch the DB.
+        env:
+          DATABASE_URL: postgres://test@localhost:5432/test
         run: bun test
