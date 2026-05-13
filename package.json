@@ -5,7 +5,9 @@
   "private": true,
   "scripts": {
     "build": "echo 'No build step required'",
-    "start": "bun run src/index.ts"
+    "start": "bun run src/index.ts",
+    "test": "bun test",
+    "typecheck": "bun run --bun tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "latest"
