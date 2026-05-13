@@ -66,7 +66,7 @@ async function resolveKey(key: string): Promise<AuthResult | null> {
   // point-lookups.
   //
   // Phase B.2 of the apiKey migration plan; see
-  // ~/.claude/projects/-home-exedev/memory/project_better_auth_migration.md.
+  // ~/.claude/projects/-home-eve/memory/project_better_auth_migration.md.
   // We deliberately avoid pulling Better Auth in as a dependency on
   // this billable surface — the SQL inline above is cheaper and the
   // verification logic is fully expressible in our existing stack.

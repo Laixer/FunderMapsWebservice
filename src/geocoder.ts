@@ -77,14 +77,9 @@ export async function resolveNeighborhoodId(input: string): Promise<string | nul
     return rows[0]?.id ?? null;
   }
 
-  if (format === "gfm") {
-    const rows = await sql`
-      SELECT neighborhood_id FROM data.model_risk_static
-      WHERE building_id = ${input}
-      LIMIT 1
-    `;
-    return rows[0]?.neighborhood_id ?? null;
-  }
+  // GFM is intentionally not handled here. `model_risk_static.building_id`
+  // is BAG, so a gfm-* input could never match against it — the old branch
+  // was dead code. v4 returns 404 on gfm-* by design (see CLAUDE.md).
 
   const externalId = await resolveBuildingExternalId(input);
   if (!externalId) return null;

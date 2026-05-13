@@ -32,23 +32,30 @@ Request → Extract API key (2 methods) → Validate key in DB (60s cache) → R
 
 ### Authentication
 
-API-key only. Single delivery method: `Authorization: Bearer fmsk.xxx`.
+API-key only. Single delivery method: `Authorization: Bearer fmsk.xxx`. Legacy `Authorization: authkey` and `?authkey=` were removed in `9485134`; `X-API-Key` in `257d98e` (see MIGRATION.md).
 
-Legacy `Authorization: authkey` and `?authkey=` methods were removed in commit `9485134`. `X-API-Key` header support was removed afterwards (see MIGRATION.md).
+No role checks. Key existence in either api-key table = authorized.
 
-No role checks. Key existence in `application.auth_key` = authorized.
-Auth query joins `auth_key → user → organization_user` in one round-trip, with a 60s in-memory cache per key (`AUTH_TTL_MS`).
+Auth is **dual-stack** as of `72a11e3` (Phase B.2 of the apiKey migration):
+- `application.auth_key` — legacy keys hashed as SHA-256 hex.
+- `application.apikey` — Better Auth `@better-auth/api-key` plugin keys hashed as SHA-256 base64url (no padding). New keys created via the TS API's management routes land here.
+
+`resolveKey` issues a single `UNION ALL` joining `organization_user` on both branches and returns at most one row (a plaintext only matches one table). The `source` column ("legacy" vs "ba") routes the fire-and-forget usage UPDATE to the right table. 60s in-memory cache per key (`AUTH_TTL_MS`); cache miss is the only time we hit the DB or bump usage. We deliberately don't pull in `better-auth` as a dependency on this billable surface — the BA hash format is reproduced inline (`sha256Base64Url`).
+
+The legacy branch dies in Phase D once the C# Webservice retires (end of Dec 2026) and `auth_key` drains.
 
 ### Geocoder ID Resolution
 
 The `:id` parameter currently supports:
 - BAG building: `NL.IMBAG.PAND.{16digits}`
 - Legacy BAG building: `{16digits}` with `10` at pos 4-5
+- BAG address: `NL.IMBAG.NUMMERAANDUIDING.{16digits}` — resolves via `geocoder.address.external_id → building_id` (N:1, two nummeraanduidingen on the same pand return the same building)
+- Legacy BAG address: `{15-16 digits}` with `20` at pos 4-5 (15-digit form is zero-padded to 16 before lookup)
 - CBS neighborhood: `BU{8digits}` (10 chars total) — statistics only
 
-Not yet implemented (planned per C# v3 parity): BAG address (`NL.IMBAG.NUMMERAANDUIDING.*`), legacy BAG address (`20` at pos 4-5), CBS district (`WK*`), CBS municipality (`GM*`).
+CBS district (`WK*`) and CBS municipality (`GM*`) are deliberately not in `detectFormat` — the `/v4/product/statistics` endpoint is keyed by neighborhood, so adding these formats without an endpoint that consumes them would mean format-recognized inputs returning 404 from the lookup query (worse UX than the unknown-format 404 they get today). Reopen if a district/municipality-level product endpoint ships.
 
-GFM identifiers (`gfm-*`) are intentionally out of scope for v4. The `detectFormat` branch exists but the lookup path does not resolve correctly, and that is accepted — `gfm-*` inputs return 404.
+GFM identifiers (`gfm-*`) are intentionally out of scope for v4 and return 404. The `gfm` branch in `detectFormat` is preserved so future GFM-aware paths can pattern-match against it; the corresponding lookup branches return null/404 by design.
 
 ### Product Tracking
 
@@ -58,7 +65,8 @@ After-response middleware inserts into `application.product_tracker` with 24-hou
 
 - `data.model_risk_static` — main analysis view. Keyed by `building_id` (BAG, e.g. `NL.IMBAG.PAND.*`). `neighborhood_id` column holds the GFM neighborhood id.
 - `data.statistics_product_*` — 9 statistics views (all keyed by GFM neighborhood_id or municipality_id)
-- `application.auth_key` — API keys (key + user_id)
+- `application.auth_key` — legacy API keys (SHA-256 hex hash of plaintext; `key_hash` + `user_id`; `last_used` bumped fire-and-forget on cache miss)
+- `application.apikey` — Better Auth plugin API keys (SHA-256 base64url-no-padding hash; `key` + `reference_id` (=user_id); `last_request` + `request_count` bumped on cache miss)
 - `application.product_tracker` — usage tracking. `building_id` stores the resolved BAG id (typed `geocoder.geocoder_id`, FK to `geocoder.building.external_id`); `identifier` preserves the raw client-supplied id.
 - `geocoder.building` — id=GFM, external_id=BAG
 - `geocoder.neighborhood/district/municipality` — GFM IDs with CBS external_ids
@@ -79,7 +87,7 @@ src/
 ├── index.ts        # Hono app, middleware stack, error handler
 ├── config.ts       # DATABASE_URL + PORT (8080), Zod validated
 ├── db.ts           # postgres.js connection with numeric/bigint type parsers
-├── auth.ts         # API key middleware (4 methods, single join query)
+├── auth.ts         # API key middleware (Bearer only; dual-stack UNION ALL across auth_key + apikey)
 ├── geocoder.ts     # ID format detection + resolution functions
 ├── tracker.ts      # After-response product tracking middleware
 └── routes/
