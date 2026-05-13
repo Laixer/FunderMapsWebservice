@@ -1,6 +1,6 @@
 import { sql } from "./db.ts";
 
-type IdFormat =
+export type IdFormat =
   | "bag_building"
   | "bag_legacy_building"
   | "bag_address"
@@ -9,7 +9,7 @@ type IdFormat =
   | "cbs_neighborhood"
   | "unknown";
 
-function detectFormat(input: string): IdFormat {
+export function detectFormat(input: string): IdFormat {
   const id = input.replaceAll(" ", "").toUpperCase();
 
   if (id.startsWith("NL.IMBAG.PAND.")) return "bag_building";

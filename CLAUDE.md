@@ -11,6 +11,8 @@ Every request is a billable product call. Uptime and correctness are paramount.
 ```bash
 bun install          # install dependencies
 bun run src/index.ts # start the server (port 8080)
+bun test             # run unit tests (src/*.test.ts)
+bun run typecheck    # tsc --noEmit
 ```
 
 ## Architecture

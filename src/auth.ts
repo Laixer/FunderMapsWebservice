@@ -11,7 +11,7 @@ interface AuthResult {
 const AUTH_TTL_MS = 60_000;
 const cache = new Map<string, AuthResult>();
 
-function extractKey(c: { req: { header: (name: string) => string | undefined } }): string | null {
+export function extractKey(c: { req: { header: (name: string) => string | undefined } }): string | null {
   const authHeader = c.req.header("Authorization");
   if (authHeader) {
     const match = authHeader.match(/^Bearer\s+(\S.*)$/i);
@@ -21,7 +21,7 @@ function extractKey(c: { req: { header: (name: string) => string | undefined } }
   return null;
 }
 
-async function sha256Hex(input: string): Promise<string> {
+export async function sha256Hex(input: string): Promise<string> {
   const buf = await crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(input),
@@ -37,7 +37,7 @@ async function sha256Hex(input: string): Promise<string> {
 //   `base64Url.encode(new Uint8Array(hash), { padding: false })`.
 // Different format from the legacy hex; the dual-read SQL below uses
 // both because plaintext can only live in one of the two tables.
-async function sha256Base64Url(input: string): Promise<string> {
+export async function sha256Base64Url(input: string): Promise<string> {
   const buf = await crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(input),
