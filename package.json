@@ -10,14 +10,12 @@
     "typecheck": "bun run --bun tsc --noEmit"
   },
   "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+    "@types/bun": "latest",
+    "typescript": "^6.0.3"
   },
   "dependencies": {
-    "hono": "^4.12.5",
-    "postgres": "^3.4.8",
-    "zod": "^4.3.6"
+    "hono": "^4.12.21",
+    "postgres": "^3.4.9",
+    "zod": "^4.4.3"
   }
 }

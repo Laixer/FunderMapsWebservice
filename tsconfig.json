@@ -2,6 +2,9 @@
   "compilerOptions": {
     // Environment setup & latest features
     "lib": ["ESNext"],
+    // TS 6 no longer auto-includes @types/* under bundler resolution; pin the
+    // Bun typings explicitly (bun-types also pulls in the Node globals).
+    "types": ["bun-types"],
     "target": "ESNext",
     "module": "Preserve",
     "moduleDetection": "force",
