@@ -104,5 +104,5 @@ src/
 - Construction years as integers (`1800`) not ISO timestamps
 - Foundation risk as array of objects, not `percentageA/B/C/D/E` keys
 - Municipality data actually works (C# had a bug with GFM→CBS resolution)
-- `enforcementTerm` and `overallQuality` included in analysis response
+- `enforcementTerm` and `overallQuality` dropped from the analysis response
 - Supports `Authorization: Bearer` for API keys (new, preferred method)
