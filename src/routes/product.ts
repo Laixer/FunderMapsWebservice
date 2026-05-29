@@ -36,7 +36,12 @@ product.get("/analysis/:id", async (c) => {
       dewatering_depth_risk AS "dewateringDepthRisk",
       dewatering_depth_risk_reliability AS "dewateringDepthReliability",
       unclassified_risk     AS "unclassifiedRisk",
-      recovery_type         AS "recoveryType"
+      recovery_type         AS "recoveryType",
+      -- Number of addresses (nummeraanduidingen) on this BAG pand. Consumers
+      -- use it to split restoration costs per address/object within a single
+      -- building (see issue #988). Precomputed in the view (== count of
+      -- geocoder.address rows for this building_id).
+      address_count         AS "addressCount"
     FROM data.model_risk_static
     WHERE building_id = ${externalId}
     LIMIT 1
