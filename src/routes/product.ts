@@ -1,6 +1,12 @@
 import { Hono } from "hono";
 import { sql } from "../db.ts";
 import { resolveBuildingExternalId, resolveNeighborhoodId } from "../geocoder.ts";
+import {
+  computeOverallRisk,
+  type RecoveryType,
+  type Reliability,
+  type Risk,
+} from "../risk.ts";
 import type { AppEnv } from "../index.ts";
 
 const product = new Hono<AppEnv>();
@@ -57,6 +63,103 @@ product.get("/analysis/:id", async (c) => {
   });
 
   return c.json(rows[0]);
+});
+
+// /v4/product/risk — subset of `analysis` aimed at financial / valuation
+// chains and dashboards (issue #985). Same data source, fewer fields.
+product.get("/risk/:id", async (c) => {
+  const id = c.req.param("id");
+  const externalId = await resolveBuildingExternalId(id);
+  if (!externalId) return c.json({ message: "Not found" }, 404);
+
+  const rows = await sql`
+    SELECT
+      building_id           AS "buildingId",
+      foundation_type       AS "foundationType",
+      foundation_type_reliability AS "foundationTypeReliability",
+      restoration_costs     AS "restorationCosts",
+      drystand_risk         AS "drystandRisk",
+      drystand_risk_reliability AS "drystandRiskReliability",
+      bio_infection_risk    AS "bioInfectionRisk",
+      bio_infection_risk_reliability AS "bioInfectionRiskReliability",
+      dewatering_depth_risk AS "dewateringDepthRisk",
+      dewatering_depth_risk_reliability AS "dewateringDepthRiskReliability",
+      recovery_type         AS "recoveryType"
+    FROM data.model_risk_static
+    WHERE building_id = ${externalId}
+    LIMIT 1
+  `;
+
+  if (rows.length === 0) return c.json({ message: "Not found" }, 404);
+
+  c.set("tracker", {
+    tenantId: c.get("tenantId"),
+    product: "risk3",
+    buildingId: externalId,
+    identifier: id,
+  });
+
+  return c.json(rows[0]);
+});
+
+// /v4/product/light — minimal output for fast chain integrations
+// (issue #985). overallRisk + overallRiskReliability are derived from
+// the three component risks; recoveryType overrides them to A,established.
+product.get("/light/:id", async (c) => {
+  const id = c.req.param("id");
+  const externalId = await resolveBuildingExternalId(id);
+  if (!externalId) return c.json({ message: "Not found" }, 404);
+
+  const rows = await sql`
+    SELECT
+      restoration_costs     AS "restorationCosts",
+      drystand_risk         AS "drystandRisk",
+      drystand_risk_reliability AS "drystandRiskReliability",
+      bio_infection_risk    AS "bioInfectionRisk",
+      bio_infection_risk_reliability AS "bioInfectionRiskReliability",
+      dewatering_depth_risk AS "dewateringDepthRisk",
+      dewatering_depth_risk_reliability AS "dewateringDepthRiskReliability",
+      recovery_type         AS "recoveryType"
+    FROM data.model_risk_static
+    WHERE building_id = ${externalId}
+    LIMIT 1
+  `;
+
+  if (rows.length === 0) return c.json({ message: "Not found" }, 404);
+
+  const row = rows[0] as {
+    restorationCosts: number | null;
+    drystandRisk: Risk | null;
+    drystandRiskReliability: Reliability | null;
+    bioInfectionRisk: Risk | null;
+    bioInfectionRiskReliability: Reliability | null;
+    dewateringDepthRisk: Risk | null;
+    dewateringDepthRiskReliability: Reliability | null;
+    recoveryType: RecoveryType | null;
+  };
+
+  const overall = computeOverallRisk(
+    [
+      { risk: row.drystandRisk, reliability: row.drystandRiskReliability },
+      { risk: row.bioInfectionRisk, reliability: row.bioInfectionRiskReliability },
+      { risk: row.dewateringDepthRisk, reliability: row.dewateringDepthRiskReliability },
+    ],
+    row.recoveryType,
+  );
+
+  c.set("tracker", {
+    tenantId: c.get("tenantId"),
+    product: "light3",
+    buildingId: externalId,
+    identifier: id,
+  });
+
+  return c.json({
+    restorationCosts: row.restorationCosts,
+    drystandRisk: row.drystandRisk,
+    overallRisk: overall.risk,
+    overallRiskReliability: overall.reliability,
+  });
 });
 
 product.get("/statistics/:id", async (c) => {

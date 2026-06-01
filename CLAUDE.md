@@ -28,6 +28,8 @@ Request → Extract API key (2 methods) → Validate key in DB (60s cache) → R
 ### Endpoints
 
 - `GET /v4/product/analysis/:id` — building risk analysis
+- `GET /v4/product/risk/:id` — subset of `analysis` for valuation chains and dashboards (issue #985)
+- `GET /v4/product/light/:id` — minimal output with a derived `overallRisk`; see `src/risk.ts` for the priority rules and the recovery-type override (issue #985)
 - `GET /v4/product/statistics/:id` — neighborhood statistics (9 parallel queries)
 - `GET /v4/usage` — per-tenant request count stats (daily/monthly/total)
 - `GET /health` — health check
@@ -91,6 +93,7 @@ src/
 ├── db.ts           # postgres.js connection with numeric/bigint type parsers
 ├── auth.ts         # API key middleware (Bearer only; dual-stack UNION ALL across auth_key + apikey)
 ├── geocoder.ts     # ID format detection + resolution functions
+├── risk.ts         # Pure overallRisk computation for /v4/product/light
 ├── tracker.ts      # After-response product tracking middleware
 └── routes/
     ├── product.ts  # analysis + statistics endpoints
