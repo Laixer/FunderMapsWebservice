@@ -20,6 +20,8 @@ export type AppEnv = {
   Variables: {
     userId: string;
     tenantId: string;
+    apiKeyId: string;
+    apiKeySource: "ba" | "legacy";
     tracker?: {
       tenantId: string;
       product: string;

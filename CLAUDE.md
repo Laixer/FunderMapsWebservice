@@ -34,6 +34,8 @@ Request → Extract API key (2 methods) → Validate key in DB (60s cache) → R
 - `GET /v4/usage` — per-tenant request count stats (daily/monthly/total)
 - `GET /health` — health check
 
+Each `/v4/product/*` route is wrapped in a `rateLimit(<trackerName>)` middleware that enforces a per-(API key, product) calendar-window limit against `application.api_key_rate_limit`. The unit is **billable events** (post-dedup `product_tracker` rows), not raw requests — same unit we bill on. Absent config row = unlimited. Overage returns 429 + `Retry-After` and emits a one-line JSON `rate_limit_exceeded` log for monitoring. See `src/rate-limit.ts` and issue #8.
+
 ### Authentication
 
 API-key only. Single delivery method: `Authorization: Bearer fmsk.xxx`. Legacy `Authorization: authkey` and `?authkey=` were removed in `9485134`; `X-API-Key` in `257d98e` (see MIGRATION.md).
@@ -93,6 +95,7 @@ src/
 ├── db.ts           # postgres.js connection with numeric/bigint type parsers
 ├── auth.ts         # API key middleware (Bearer only; dual-stack UNION ALL across auth_key + apikey)
 ├── geocoder.ts     # ID format detection + resolution functions
+├── rate-limit.ts   # Per-(key, product) calendar-window rate limit middleware
 ├── risk.ts         # Pure overallRisk computation for /v4/product/light
 ├── tracker.ts      # After-response product tracking middleware
 └── routes/

@@ -5,6 +5,8 @@ import type { AppEnv } from "./index.ts";
 interface AuthResult {
   userId: string;
   tenantId: string;
+  apiKeyId: string;
+  apiKeySource: "ba" | "legacy";
   expiresAt: number;
 }
 
@@ -75,12 +77,12 @@ async function resolveKey(key: string): Promise<AuthResult | null> {
     sha256Base64Url(key),
   ]);
   const rows = await sql`
-    SELECT ak.user_id, ou.organization_id, 'legacy' AS source
+    SELECT ak.id::text AS api_key_id, ak.user_id, ou.organization_id, 'legacy' AS source
     FROM application.auth_key ak
     JOIN application.organization_user ou ON ou.user_id = ak.user_id
     WHERE ak.key_hash = ${keyHashHex}
     UNION ALL
-    SELECT ak.reference_id AS user_id, ou.organization_id, 'ba' AS source
+    SELECT ak.id AS api_key_id, ak.reference_id AS user_id, ou.organization_id, 'ba' AS source
     FROM application.apikey ak
     JOIN application.organization_user ou ON ou.user_id = ak.reference_id
     WHERE ak.key = ${keyHashB64Url}
@@ -109,6 +111,8 @@ async function resolveKey(key: string): Promise<AuthResult | null> {
   const result: AuthResult = {
     userId: rows[0]!.user_id,
     tenantId: rows[0]!.organization_id,
+    apiKeyId: rows[0]!.api_key_id,
+    apiKeySource: rows[0]!.source,
     expiresAt: now + AUTH_TTL_MS,
   };
 
@@ -125,5 +129,7 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
 
   c.set("userId", auth.userId);
   c.set("tenantId", auth.tenantId);
+  c.set("apiKeyId", auth.apiKeyId);
+  c.set("apiKeySource", auth.apiKeySource);
   return next();
 });
