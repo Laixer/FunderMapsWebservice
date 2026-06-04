@@ -43,6 +43,16 @@ const cases: { input: string; expected: IdFormat; why: string }[] = [
   { input: "WK0123", expected: "unknown", why: "CBS district intentionally not supported" },
   { input: "GM0123", expected: "unknown", why: "CBS municipality intentionally not supported" },
   { input: "1234300000000001", expected: "unknown", why: "16 digits but unrecognised middle pair (30)" },
+
+  // Control characters (incl. NUL) must be rejected. A NUL after a PAND/
+  // NUMMERAANDUIDING prefix would otherwise pass the startsWith() branch and
+  // reach Postgres as a bind param, raising `invalid byte sequence for encoding
+  // "UTF8": 0x00` → unhandled 500. Found via input fuzzing (2026-06-04).
+  { input: "NL.IMBAG.PAND." + String.fromCharCode(0) + "0344100000000001", expected: "unknown", why: "NUL after PAND prefix (would 500 pre-fix)" },
+  { input: "NL.IMBAG.PAND.0344100000000001" + String.fromCharCode(0), expected: "unknown", why: "trailing NUL on a PAND id" },
+  { input: "NL.IMBAG.NUMMERAANDUIDING." + String.fromCharCode(0) + "0344200000000001", expected: "unknown", why: "NUL after NUMMERAANDUIDING prefix" },
+  { input: "NL.IMBAG.PAND.0344100000" + String.fromCharCode(9) + "000001", expected: "unknown", why: "tab control char" },
+  { input: "NL.IMBAG.PAND.0344100000" + String.fromCharCode(127) + "00001", expected: "unknown", why: "DEL (0x7f) control char" },
 ];
 
 describe("detectFormat", () => {
