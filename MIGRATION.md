@@ -43,11 +43,23 @@ The `/api` prefix is removed and the version changes from `v3` to `v4`.
 | Endpoint | Accepted formats |
 |----------|------------------|
 | `/v4/product/analysis/{id}` | BAG pand (`NL.IMBAG.PAND.0599100000369041` or 16-digit `0599100000369041`); BAG nummeraanduiding (`NL.IMBAG.NUMMERAANDUIDING.0599200000123456` or 16-/15-digit bare form) |
+| `/v4/product/risk/{id}` | Same as `analysis` |
+| `/v4/product/light/{id}` | Same as `analysis` |
 | `/v4/product/statistics/{id}` | Any of the above, plus CBS neighborhood (`BU03630000`) |
 
 Nummeraanduiding IDs are resolved to their pand before lookup. BAG address-to-building is many-to-one, so two nummeraanduidingen on the same pand return identical analysis and statistics — that's expected, the model is building-level.
 
 Unrecognized or unresolvable IDs return `404 {"message":"Not found"}`.
+
+### New in v4: `/v4/product/risk` and `/v4/product/light`
+
+Two additional product endpoints are available in v4 with no v3 equivalent.
+
+**`/v4/product/risk/{id}`** — a subset of `analysis` for valuation chains and dashboards. Returns: `buildingId`, `foundationType`, `foundationTypeReliability`, `restorationCosts`, `drystandRisk`, `drystandRiskReliability`, `bioInfectionRisk`, `bioInfectionRiskReliability`, `dewateringDepthRisk`, `dewateringDepthRiskReliability`, `recoveryType`.
+
+**`/v4/product/light/{id}`** — minimal response for fast integrations. Collapses the three component risks into a single derived `overallRisk` + `overallRiskReliability`. If a `recoveryType` is set on the building (i.e. the foundation has been restored), `overallRisk` is forced to `a` with `established` reliability. Returns: `restorationCosts`, `drystandRisk`, `overallRisk`, `overallRiskReliability`.
+
+Same authentication, ID formats, and error responses as `analysis`.
 
 ## 2. Authentication
 
@@ -138,8 +150,8 @@ Both were dropped because the underlying source column had drifted away from the
 | Field | Values |
 |-------|--------|
 | foundationType | `wood`, `wood_amsterdam`, `wood_rotterdam`, `concrete`, `no_pile`, `wood_charger`, `weighted_pile`, `combined`, `steel_pile`, `other` |
-| reliability | `indicative`, `established` |
+| reliability | `indicative`, `established`, `cluster`, `supercluster` |
 | foundationRisk | `a`, `b`, `c`, `d`, `e` |
 | damageCause | `bio_infection`, `drainage`, `construction_flaw`, `drystand`, `overcharge_negative_cling`, `negative_cling`, `overcharge`, `vegetation`, `gas`, `vibrations`, `foundation_flaw`, `partial_foundation_recovery`, `subsidence` |
 | inquiryType | `additional_research`, `architectural_research`, `demolition`, `foundation_advice`, `foundation_research`, `inspection`, `monitor`, `note`, `second_opinion`, `quick_scan`, `unknown` |
-| recoveryType | `beam_on_pile`, `pile_in_wall`, `table`, `injection`, `unknown` |
+| recoveryType | `beam_on_pile`, `pile_lowering`, `pile_in_wall`, `table`, `injection`, `unknown` |
