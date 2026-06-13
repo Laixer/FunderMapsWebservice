@@ -12,6 +12,13 @@ export type IdFormat =
 export function detectFormat(input: string): IdFormat {
   const id = input.replaceAll(" ", "").toUpperCase();
 
+  // No identifier format contains control characters. A NUL byte in particular
+  // reaches Postgres as a bind parameter and raises `invalid byte sequence for
+  // encoding "UTF8": 0x00`, which would otherwise escape the route handler as a
+  // 500. Classify any control char as unrecognized so the route returns a clean
+  // 404 instead. (Found via input fuzzing, 2026-06-04.)
+  if ([...id].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f)) return "unknown";
+
   if (id.startsWith("NL.IMBAG.PAND.")) return "bag_building";
   if (id.startsWith("NL.IMBAG.NUMMERAANDUIDING.")) return "bag_address";
   if (/^\d{4}10\d{10}$/.test(id)) return "bag_legacy_building";

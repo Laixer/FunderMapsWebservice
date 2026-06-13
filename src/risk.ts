@@ -14,19 +14,9 @@
 // class by definition. The override is reported as established
 // reliability since the recovery flag itself is hard evidence.
 
-export type Risk = "a" | "b" | "c" | "d" | "e";
-export type Reliability =
-  | "indicative"
-  | "established"
-  | "cluster"
-  | "supercluster";
-export type RecoveryType =
-  | "table"
-  | "beam_on_pile"
-  | "pile_lowering"
-  | "pile_in_wall"
-  | "injection"
-  | "unknown";
+import type { Reliability, RecoveryType, Risk } from "./enums.ts";
+
+export type { Reliability, RecoveryType, Risk };
 
 export interface RiskComponent {
   risk: Risk | null;

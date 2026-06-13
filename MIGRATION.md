@@ -43,11 +43,23 @@ The `/api` prefix is removed and the version changes from `v3` to `v4`.
 | Endpoint | Accepted formats |
 |----------|------------------|
 | `/v4/product/analysis/{id}` | BAG pand (`NL.IMBAG.PAND.0599100000369041` or 16-digit `0599100000369041`); BAG nummeraanduiding (`NL.IMBAG.NUMMERAANDUIDING.0599200000123456` or 16-/15-digit bare form) |
+| `/v4/product/risk/{id}` | Same as `analysis` |
+| `/v4/product/light/{id}` | Same as `analysis` |
 | `/v4/product/statistics/{id}` | Any of the above, plus CBS neighborhood (`BU03630000`) |
 
 Nummeraanduiding IDs are resolved to their pand before lookup. BAG address-to-building is many-to-one, so two nummeraanduidingen on the same pand return identical analysis and statistics — that's expected, the model is building-level.
 
 Unrecognized or unresolvable IDs return `404 {"message":"Not found"}`.
+
+### New in v4: `/v4/product/risk` and `/v4/product/light`
+
+Two additional product endpoints are available in v4 with no v3 equivalent.
+
+**`/v4/product/risk/{id}`** — a subset of `analysis` for valuation chains and dashboards. Returns: `buildingId`, `foundationType`, `foundationTypeReliability`, `restorationCosts`, `drystandRisk`, `drystandRiskReliability`, `bioInfectionRisk`, `bioInfectionRiskReliability`, `dewateringDepthRisk`, `dewateringDepthRiskReliability`, `recoveryType`.
+
+**`/v4/product/light/{id}`** — minimal response for fast integrations. Collapses the three component risks into a single derived `overallRisk` + `overallRiskReliability`. If a `recoveryType` is set on the building (i.e. the foundation has been restored), `overallRisk` is forced to `a` with `established` reliability. Returns: `restorationCosts`, `drystandRisk`, `overallRisk`, `overallRiskReliability`.
+
+Same authentication, ID formats, and error responses as `analysis`.
 
 ## 2. Authentication
 
@@ -135,11 +147,22 @@ Both were dropped because the underlying source column had drifted away from the
 
 ## Enum reference
 
+The values below are the exact, complete label sets of the database enum types the API serves from — every value a v4 response can contain is listed, and a CI check keeps this table in sync with the implementation (`src/enums.ts`). All enum fields are nullable: expect `null` when the underlying data point is absent.
+
 | Field | Values |
 |-------|--------|
-| foundationType | `wood`, `wood_amsterdam`, `wood_rotterdam`, `concrete`, `no_pile`, `wood_charger`, `weighted_pile`, `combined`, `steel_pile`, `other` |
-| reliability | `indicative`, `established` |
+| foundationType | `wood`, `concrete`, `no_pile`, `wood_charger`, `weighted_pile`, `combined`, `steel_pile`, `other`, `no_pile_masonry`, `no_pile_strips`, `no_pile_concrete_floor`, `no_pile_slit`, `wood_amsterdam`, `wood_rotterdam`, `no_pile_bearing_floor`, `wood_rotterdam_amsterdam`, `wood_rotterdam_arch`, `wood_amsterdam_arch` |
+| reliability | `indicative`, `established`, `cluster`, `supercluster` |
 | foundationRisk | `a`, `b`, `c`, `d`, `e` |
-| damageCause | `bio_infection`, `drainage`, `construction_flaw`, `drystand`, `overcharge_negative_cling`, `negative_cling`, `overcharge`, `vegetation`, `gas`, `vibrations`, `foundation_flaw`, `partial_foundation_recovery`, `subsidence` |
-| inquiryType | `additional_research`, `architectural_research`, `demolition`, `foundation_advice`, `foundation_research`, `inspection`, `monitor`, `note`, `second_opinion`, `quick_scan`, `unknown` |
-| recoveryType | `beam_on_pile`, `pile_in_wall`, `table`, `injection`, `unknown` |
+| damageCause | `drainage`, `construction_flaw`, `drystand`, `overcharge`, `overcharge_negative_cling`, `negative_cling`, `bio_infection`, `fungus_infection`, `bio_fungus_infection`, `foundation_flaw`, `construction_heave`, `subsidence`, `vegetation`, `gas`, `vibrations`, `partial_foundation_recovery`, `japanese_knotweed`, `groundwater_level_reduction` |
+| inquiryType | `monitoring`, `note`, `quickscan`, `unknown`, `demolition_research`, `second_opinion`, `archive_research`, `architectural_research`, `foundation_advice`, `inspectionpit`, `foundation_research`, `additional_research`, `ground_water_level_research`, `soil_investigation`, `facade_scan` |
+| recoveryType | `table`, `beam_on_pile`, `pile_lowering`, `pile_in_wall`, `injection`, `unknown` |
+
+> **Correction notice (June 2026).** Earlier revisions of this table were incomplete and listed four `inquiryType` values that the API never returns. If you implemented against an earlier revision, update your parsers:
+>
+> - `monitor` → the API returns `monitoring`
+> - `inspection` → the API returns `inspectionpit`
+> - `demolition` → the API returns `demolition_research`
+> - `quick_scan` → the API returns `quickscan`
+>
+> Additionally, 8 `foundationType` values, 5 `damageCause` values, and 4 further `inquiryType` values (`archive_research`, `ground_water_level_research`, `soil_investigation`, `facade_scan`) were missing and have been added above. Treat any enum value outside this table as a defect and report it to us.

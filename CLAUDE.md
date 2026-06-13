@@ -95,6 +95,7 @@ src/
 ├── db.ts           # postgres.js connection with numeric/bigint type parsers
 ├── auth.ts         # API key middleware (Bearer only; dual-stack UNION ALL across auth_key + apikey)
 ├── geocoder.ts     # ID format detection + resolution functions
+├── enums.ts        # Canonical enum label sets mirroring pg_enum; doc/db sync checked by enums.test.ts (issue #996)
 ├── rate-limit.ts   # Per-(key, product) calendar-window rate limit middleware
 ├── risk.ts         # Pure overallRisk computation for /v4/product/light
 ├── tracker.ts      # After-response product tracking middleware
