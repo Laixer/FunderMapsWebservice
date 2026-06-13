@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { sql } from "../db.ts";
 import { resolveBuildingExternalId, resolveNeighborhoodId } from "../geocoder.ts";
+import { rateLimit } from "../rate-limit.ts";
 import {
   computeOverallRisk,
   type RecoveryType,
@@ -11,7 +12,7 @@ import type { AppEnv } from "../index.ts";
 
 const product = new Hono<AppEnv>();
 
-product.get("/analysis/:id", async (c) => {
+product.get("/analysis/:id", rateLimit("analysis3"), async (c) => {
   const id = c.req.param("id");
   const externalId = await resolveBuildingExternalId(id);
   if (!externalId) return c.json({ message: "Not found" }, 404);
@@ -67,7 +68,7 @@ product.get("/analysis/:id", async (c) => {
 
 // /v4/product/risk — subset of `analysis` aimed at financial / valuation
 // chains and dashboards (issue #985). Same data source, fewer fields.
-product.get("/risk/:id", async (c) => {
+product.get("/risk/:id", rateLimit("risk3"), async (c) => {
   const id = c.req.param("id");
   const externalId = await resolveBuildingExternalId(id);
   if (!externalId) return c.json({ message: "Not found" }, 404);
@@ -105,7 +106,7 @@ product.get("/risk/:id", async (c) => {
 // /v4/product/light — minimal output for fast chain integrations
 // (issue #985). overallRisk + overallRiskReliability are derived from
 // the three component risks; recoveryType overrides them to A,established.
-product.get("/light/:id", async (c) => {
+product.get("/light/:id", rateLimit("light3"), async (c) => {
   const id = c.req.param("id");
   const externalId = await resolveBuildingExternalId(id);
   if (!externalId) return c.json({ message: "Not found" }, 404);
@@ -162,7 +163,7 @@ product.get("/light/:id", async (c) => {
   });
 });
 
-product.get("/statistics/:id", async (c) => {
+product.get("/statistics/:id", rateLimit("statistics3"), async (c) => {
   const id = c.req.param("id");
   const neighborhoodId = await resolveNeighborhoodId(id);
   if (!neighborhoodId) return c.json({ message: "Not found" }, 404);
