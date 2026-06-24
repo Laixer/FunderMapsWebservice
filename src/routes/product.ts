@@ -79,12 +79,14 @@ product.get("/risk/:id", rateLimit("risk3"), async (c) => {
       foundation_type       AS "foundationType",
       foundation_type_reliability AS "foundationTypeReliability",
       restoration_costs     AS "restorationCosts",
+      inquiry_type          AS "inquiryType",
       drystand_risk         AS "drystandRisk",
-      drystand_risk_reliability AS "drystandRiskReliability",
+      drystand_risk_reliability AS "drystandReliability",
       bio_infection_risk    AS "bioInfectionRisk",
-      bio_infection_risk_reliability AS "bioInfectionRiskReliability",
+      bio_infection_risk_reliability AS "bioInfectionReliability",
       dewatering_depth_risk AS "dewateringDepthRisk",
-      dewatering_depth_risk_reliability AS "dewateringDepthRiskReliability",
+      dewatering_depth_risk_reliability AS "dewateringDepthReliability",
+      unclassified_risk     AS "unclassifiedRisk",
       recovery_type         AS "recoveryType"
     FROM data.model_risk_static
     WHERE building_id = ${externalId}
