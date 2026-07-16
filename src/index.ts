@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { logger } from "hono/logger";
+import { clampId, errorJson } from "./errors.ts";
 import { env } from "./config.ts";
 import { sql } from "./db.ts";
 import { authMiddleware } from "./auth.ts";
@@ -37,7 +38,12 @@ app.use("*", logger());
 
 app.onError((err, c) => {
   console.error(err);
-  return c.json({ message: "Internal server error" }, 500);
+  return errorJson(
+    c,
+    500,
+    "internal_server_error",
+    "An unexpected error occurred. If the problem persists, contact FunderMaps support.",
+  );
 });
 
 app.get("/health", (c) => c.json({ status: "ok" }));
@@ -48,7 +54,14 @@ app.route("/v4/product", productRoutes);
 app.use("/v4/usage/*", authMiddleware);
 app.route("/v4/usage", usageRoutes);
 
-app.notFound((c) => c.json({ message: "Not found" }, 404));
+app.notFound((c) =>
+  errorJson(
+    c,
+    404,
+    "route_not_found",
+    `Unknown endpoint: ${c.req.method} ${clampId(new URL(c.req.url).pathname)}`,
+  ),
+);
 
 export default {
   port: env.PORT,

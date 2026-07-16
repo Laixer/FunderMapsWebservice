@@ -16,11 +16,15 @@ import { describe, test, expect, mock, beforeEach } from "bun:test";
 
 let capturedQuery = "";
 let queryRows: unknown[] = [];
+// When set, each sql call consumes the next entry instead of queryRows —
+// needed for flows that issue multiple, differently-shaped queries
+// (address resolution → product query → miss classification).
+let queryQueue: unknown[][] = [];
 
 mock.module("../db.ts", () => ({
   sql: (strings: TemplateStringsArray, ..._values: unknown[]) => {
     capturedQuery = strings.join("");
-    return Promise.resolve(queryRows);
+    return Promise.resolve(queryQueue.length > 0 ? queryQueue.shift() : queryRows);
   },
 }));
 
@@ -48,21 +52,17 @@ const RISK_ROW = {
 beforeEach(() => {
   capturedQuery = "";
   queryRows = [];
+  queryQueue = [];
 });
 
 describe("GET /risk/:id", () => {
-  test("unresolvable id → 404 (never touches the product query)", async () => {
+  test("unrecognized id format → 404 identifier_invalid (never touches the product query)", async () => {
     const res = await product.request(`/risk/not-a-bag-id`);
     expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ message: "Not found" });
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("identifier_invalid");
+    expect(body.message).toContain("not-a-bag-id");
     expect(capturedQuery).toBe(""); // bailed before the SQL ran
-  });
-
-  test("resolved id but no matching building → 404", async () => {
-    queryRows = [];
-    const res = await product.request(`/risk/${BAG}`);
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ message: "Not found" });
   });
 
   test("resolved id with a row → 200 and the row is returned verbatim", async () => {
@@ -96,5 +96,69 @@ describe("GET /risk/:id", () => {
     expect(capturedQuery).toContain('AS "dewateringDepthReliability"');
     // The pre-alignment aliases must not linger anywhere in the projection.
     expect(capturedQuery).not.toContain('RiskReliability"');
+  });
+});
+
+// The 404 reason split for issue Laixer/FunderMaps#1002: consumers must be
+// able to pick the follow-up step (resubmit corrected address / request a
+// QuickScan / do nothing) from `code` alone. Exercised through the /risk
+// handler with the real geocoder against the mocked db; the same
+// resolutionError path serves analysis and light.
+describe("GET /risk/:id — 404 reason codes (issue #1002)", () => {
+  const ADDRESS = "NL.IMBAG.NUMMERAANDUIDING.0599200000654061";
+
+  test("pand id unknown in BAG → building_not_found", async () => {
+    // product query misses, then geocoder.building lookup misses too
+    queryQueue = [[], []];
+    const res = await product.request(`/risk/${BAG}`);
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("building_not_found");
+    expect(body.message).toContain(BAG);
+    // The classification query ran against geocoder.building.
+    expect(capturedQuery).toContain("FROM geocoder.building");
+  });
+
+  test("pand known but no data row → no_data_available (the QuickScan case)", async () => {
+    queryQueue = [[], [{ building_type: "house" }]];
+    const res = await product.request(`/risk/${BAG}`);
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("no_data_available");
+    expect(body.message).toContain(BAG);
+  });
+
+  test("address resolving to a ligplaats → not_a_building (no classification query needed)", async () => {
+    queryQueue = [[{ building_id: "NL.IMBAG.LIGPLAATS.0599020000123456" }]];
+    const res = await product.request(`/risk/${ADDRESS}`);
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("not_a_building");
+    // Bailed at resolution: the last query was the address lookup, not
+    // the product query or geocoder.building.
+    expect(capturedQuery).toContain("FROM geocoder.address");
+  });
+
+  test("address resolving to a standplaats → not_a_building", async () => {
+    queryQueue = [[{ building_id: "NL.IMBAG.STANDPLAATS.0599030000123456" }]];
+    const res = await product.request(`/risk/${ADDRESS}`);
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { code: string }).code).toBe("not_a_building");
+  });
+
+  test("unknown address → address_not_found", async () => {
+    queryQueue = [[]];
+    const res = await product.request(`/risk/${ADDRESS}`);
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("address_not_found");
+    expect(body.message).toContain(ADDRESS);
+  });
+
+  test("address resolving to a pand with a data row → 200", async () => {
+    queryQueue = [[{ building_id: BAG }], [RISK_ROW]];
+    const res = await product.request(`/risk/${ADDRESS}`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(RISK_ROW);
   });
 });

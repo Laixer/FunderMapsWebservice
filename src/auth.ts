@@ -1,5 +1,6 @@
 import { createMiddleware } from "hono/factory";
 import { sql } from "./db.ts";
+import { errorJson } from "./errors.ts";
 import type { AppEnv } from "./index.ts";
 
 interface AuthResult {
@@ -122,10 +123,24 @@ async function resolveKey(key: string): Promise<AuthResult | null> {
 
 export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   const key = extractKey(c);
-  if (!key) return c.json({ message: "Unauthorized" }, 401);
+  if (!key) {
+    return errorJson(
+      c,
+      401,
+      "missing_api_key",
+      "Missing API key. Provide it as 'Authorization: Bearer <key>'.",
+    );
+  }
 
   const auth = await resolveKey(key);
-  if (!auth) return c.json({ message: "Unauthorized" }, 401);
+  if (!auth) {
+    return errorJson(
+      c,
+      401,
+      "invalid_api_key",
+      "The provided API key is invalid, disabled, or expired.",
+    );
+  }
 
   c.set("userId", auth.userId);
   c.set("tenantId", auth.tenantId);

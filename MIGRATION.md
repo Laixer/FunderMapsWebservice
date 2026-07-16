@@ -49,7 +49,7 @@ The `/api` prefix is removed and the version changes from `v3` to `v4`.
 
 Nummeraanduiding IDs are resolved to their pand before lookup. BAG address-to-building is many-to-one, so two nummeraanduidingen on the same pand return identical analysis and statistics — that's expected, the model is building-level.
 
-Unrecognized or unresolvable IDs return `404 {"message":"Not found"}`.
+Unrecognized or unresolvable IDs return a `404` with a structured error body — see [Error responses](#6-error-responses).
 
 ### New in v4: `/v4/product/risk` and `/v4/product/light`
 
@@ -133,6 +133,34 @@ Two fields that existed in v3 are **not returned** in v4:
 - `overallQuality`
 
 Both were dropped because the underlying source column had drifted away from the documented enum semantics. If your integration depended on them, contact us before migrating.
+
+## 6. Error responses
+
+Every non-200 response has a consistent JSON body:
+
+```json
+{ "code": "building_not_found", "message": "No data available for building 'NL.IMBAG.PAND.0599100000369041'." }
+```
+
+`code` is a stable, machine-readable identifier — switch on it in your integration. `message` is human-readable and may be reworded without notice; don't parse it.
+
+| HTTP status | `code` | Meaning | Suggested follow-up |
+|-------------|--------|---------|---------------------|
+| 401 | `missing_api_key` | No `Authorization: Bearer` header was sent | Send the key as `Authorization: Bearer fmsk.…` |
+| 401 | `invalid_api_key` | The key is unknown, disabled, or expired | Check the key; contact us if it should be active |
+| 404 | `identifier_invalid` | The `{id}` is not a recognized identifier format | Resubmit with a valid BAG pand/nummeraanduiding (or CBS neighborhood for statistics) |
+| 404 | `address_not_found` | Valid address format, but the address is not known in BAG | Resubmit with a corrected address |
+| 404 | `building_not_found` | Valid building id format, but no such building exists in BAG | Verify the building id; no foundation data can exist for it |
+| 404 | `not_a_building` | The identifier refers to a mooring or mobile-home site (ligplaats/standplaats), not a building | None — foundation risk does not apply to these objects; a QuickScan is not useful |
+| 404 | `no_data_available` | The building is known, but no foundation data is available for it | Request a QuickScan to have the building assessed |
+| 404 | `neighborhood_not_found` | Statistics only: the CBS neighborhood code is not known | Verify the `BU*` code |
+| 404 | `route_not_found` | Unknown endpoint path | Check the request path |
+| 429 | `rate_limit_exceeded` | Your per-product usage limit was reached; see the `Retry-After` and `X-RateLimit-*` headers | Retry after the indicated time |
+| 500 | `internal_server_error` | Unexpected server error | Retry later; contact support if it persists |
+
+The four 404 "no result" codes are designed so automated integrations (e.g. the NWWI valuation chain) can choose the correct follow-up action from `code` alone: a corrected resubmission (`identifier_invalid`, `address_not_found`), a QuickScan request (`no_data_available`), or no action (`building_not_found`, `not_a_building`).
+
+New codes may be added over time; treat any unlisted `code` on an error status generically based on the HTTP status.
 
 ## Quick checklist
 
