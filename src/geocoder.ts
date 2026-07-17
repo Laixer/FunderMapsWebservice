@@ -30,24 +30,53 @@ export function detectFormat(input: string): IdFormat {
   return "unknown";
 }
 
+// Resolution failures carry a reason so consumers can pick the right
+// follow-up step (issue Laixer/FunderMaps#1002, NWWI integration):
+// - invalid_format / address_not_found → the request itself is wrong;
+//   resubmit with a corrected identifier.
+// - not_a_building → the identifier points at a ligplaats/standplaats
+//   (houseboat mooring / mobile-home site) — foundation risk doesn't
+//   apply and a QuickScan is pointless.
+// - building_not_found → well-formed pand id with no BAG match.
+// - no_data_available → the building exists; we just have no data for
+//   it — the "request a QuickScan" case.
+export type BuildingResolutionFailure =
+  | "invalid_format"
+  | "address_not_found"
+  | "not_a_building";
+
+export type BuildingResolution =
+  | { ok: true; externalId: string }
+  | { ok: false; reason: BuildingResolutionFailure };
+
+// geocoder.address.building_id stores geocoder.building.external_id, which
+// the BAG load also fills for ligplaats/standplaats objects (see
+// FunderMapsWorker sql/load/load_{building,address}.sql). The prefix is
+// enough to spot the non-pand objects without an extra query.
+const NON_BUILDING_PREFIX = /^NL\.IMBAG\.(LIGPLAATS|STANDPLAATS)\./;
+
 /**
  * Resolve any identifier to a BAG external building ID (NL.IMBAG.PAND.*).
- * Returns null if the identifier cannot be resolved.
  *
  * Address inputs (nummeraanduiding) are resolved via geocoder.address →
  * geocoder.building. Address → building is N:1 in BAG, so two
  * nummeraanduidingen on the same pand resolve to the same building.
+ *
+ * Pand inputs resolve as identity WITHOUT an existence check — the happy
+ * path stays a single product query. Use classifyMissingBuildingData()
+ * when the subsequent data lookup comes up empty to tell "unknown
+ * building" apart from "known building, no data".
  */
-export async function resolveBuildingExternalId(input: string): Promise<string | null> {
+export async function resolveBuilding(input: string): Promise<BuildingResolution> {
   const format = detectFormat(input);
   const id = input.replaceAll(" ", "").toUpperCase();
 
   switch (format) {
     case "bag_building":
-      return id;
+      return { ok: true, externalId: id };
 
     case "bag_legacy_building":
-      return `NL.IMBAG.PAND.${id}`;
+      return { ok: true, externalId: `NL.IMBAG.PAND.${id}` };
 
     case "bag_address":
     case "bag_legacy_address": {
@@ -61,40 +90,89 @@ export async function resolveBuildingExternalId(input: string): Promise<string |
         WHERE external_id = ${externalAddressId}
         LIMIT 1
       `;
-      return rows[0]?.building_id ?? null;
+      const buildingId = rows[0]?.building_id as string | undefined;
+      if (!buildingId) return { ok: false, reason: "address_not_found" };
+      if (NON_BUILDING_PREFIX.test(buildingId)) {
+        return { ok: false, reason: "not_a_building" };
+      }
+      return { ok: true, externalId: buildingId };
     }
 
     default:
-      return null;
+      return { ok: false, reason: "invalid_format" };
   }
 }
+
+// Ran only on the miss path (product query returned no rows), so the
+// extra point-lookup never taxes a billable hit.
+export type MissingDataReason =
+  | "building_not_found"
+  | "not_a_building"
+  | "no_data_available";
+
+export async function classifyMissingBuildingData(
+  externalId: string,
+): Promise<MissingDataReason> {
+  const rows = await sql`
+    SELECT building_type
+    FROM geocoder.building
+    WHERE external_id = ${externalId}
+    LIMIT 1
+  `;
+  if (rows.length === 0) return "building_not_found";
+  const type = rows[0]!.building_type as string | null;
+  // Defensive: resolveBuilding() already rejects ligplaats/standplaats
+  // reached via an address, but a building_id could land here through a
+  // future call site.
+  if (type === "houseboat" || type === "mobile_home") return "not_a_building";
+  return "no_data_available";
+}
+
+export type NeighborhoodResolutionFailure =
+  | BuildingResolutionFailure
+  | MissingDataReason
+  | "neighborhood_not_found";
+
+export type NeighborhoodResolution =
+  | { ok: true; neighborhoodId: string }
+  | { ok: false; reason: NeighborhoodResolutionFailure };
 
 /**
  * Resolve any identifier to a GFM neighborhood ID (used by statistics tables).
  * For CBS neighborhood codes, translates external_id → internal GFM id.
- * For building identifiers, looks up via model_risk_static.
+ * For building identifiers, looks up via model_risk_static; a miss there is
+ * classified like the product endpoints classify it.
  */
-export async function resolveNeighborhoodId(input: string): Promise<string | null> {
+export async function resolveNeighborhood(input: string): Promise<NeighborhoodResolution> {
   const format = detectFormat(input);
 
   if (format === "cbs_neighborhood") {
     const rows = await sql`
       SELECT id FROM geocoder.neighborhood WHERE external_id = ${input} LIMIT 1
     `;
-    return rows[0]?.id ?? null;
+    const neighborhoodId = rows[0]?.id as string | undefined;
+    if (!neighborhoodId) return { ok: false, reason: "neighborhood_not_found" };
+    return { ok: true, neighborhoodId };
   }
 
   // GFM is intentionally not handled here. `model_risk_static.building_id`
   // is BAG, so a gfm-* input could never match against it — the old branch
   // was dead code. v4 returns 404 on gfm-* by design (see CLAUDE.md).
 
-  const externalId = await resolveBuildingExternalId(input);
-  if (!externalId) return null;
+  const building = await resolveBuilding(input);
+  if (!building.ok) return building;
 
   const rows = await sql`
     SELECT neighborhood_id FROM data.model_risk_static
-    WHERE building_id = ${externalId}
+    WHERE building_id = ${building.externalId}
     LIMIT 1
   `;
-  return rows[0]?.neighborhood_id ?? null;
+  const neighborhoodId = rows[0]?.neighborhood_id as string | undefined;
+  if (!neighborhoodId) {
+    return {
+      ok: false,
+      reason: await classifyMissingBuildingData(building.externalId),
+    };
+  }
+  return { ok: true, neighborhoodId };
 }

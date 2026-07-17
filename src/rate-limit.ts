@@ -13,6 +13,7 @@
 
 import { createMiddleware } from "hono/factory";
 import { sql } from "./db.ts";
+import { errorJson } from "./errors.ts";
 import type { AppEnv } from "./index.ts";
 
 export type RateLimitPeriod = "day" | "month";
@@ -166,7 +167,12 @@ export const rateLimit = (product: string) =>
           count,
         }),
       );
-      return c.json({ message: "Too Many Requests" }, 429);
+      return errorJson(
+        c,
+        429,
+        "rate_limit_exceeded",
+        `Rate limit exceeded for product '${product}': ${config.limit} per ${config.period}. Retry after ${retryAfter} seconds.`,
+      );
     }
 
     return next();

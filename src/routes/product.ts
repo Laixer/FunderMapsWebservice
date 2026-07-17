@@ -1,6 +1,13 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { sql } from "../db.ts";
-import { resolveBuildingExternalId, resolveNeighborhoodId } from "../geocoder.ts";
+import { clampId, errorJson } from "../errors.ts";
+import {
+  classifyMissingBuildingData,
+  resolveBuilding,
+  resolveNeighborhood,
+  type NeighborhoodResolutionFailure,
+} from "../geocoder.ts";
 import { rateLimit } from "../rate-limit.ts";
 import {
   computeOverallRisk,
@@ -12,10 +19,67 @@ import type { AppEnv } from "../index.ts";
 
 const product = new Hono<AppEnv>();
 
+// One 404 body per resolution-failure reason, so a consumer can pick the
+// follow-up step from `code` alone (issue Laixer/FunderMaps#1002). The
+// NeighborhoodResolutionFailure union is a superset of every reason the
+// building endpoints can produce.
+function resolutionError(
+  c: Context,
+  id: string,
+  reason: NeighborhoodResolutionFailure,
+) {
+  const shownId = clampId(id);
+  switch (reason) {
+    case "invalid_format":
+      return errorJson(
+        c,
+        404,
+        "identifier_invalid",
+        `Identifier '${shownId}' is not a recognized building, address, or neighborhood identifier format.`,
+      );
+    case "address_not_found":
+      return errorJson(
+        c,
+        404,
+        "address_not_found",
+        `Address '${shownId}' is not a known BAG address.`,
+      );
+    case "not_a_building":
+      return errorJson(
+        c,
+        404,
+        "not_a_building",
+        `Identifier '${shownId}' refers to a mooring or mobile-home site (ligplaats/standplaats), not a building. No foundation data exists for these objects.`,
+      );
+    case "building_not_found":
+      return errorJson(
+        c,
+        404,
+        "building_not_found",
+        `Building '${shownId}' is not a known BAG building.`,
+      );
+    case "no_data_available":
+      return errorJson(
+        c,
+        404,
+        "no_data_available",
+        `Building '${shownId}' is known, but no foundation data is available for it.`,
+      );
+    case "neighborhood_not_found":
+      return errorJson(
+        c,
+        404,
+        "neighborhood_not_found",
+        `Neighborhood '${shownId}' is not a known CBS neighborhood.`,
+      );
+  }
+}
+
 product.get("/analysis/:id", rateLimit("analysis3"), async (c) => {
   const id = c.req.param("id");
-  const externalId = await resolveBuildingExternalId(id);
-  if (!externalId) return c.json({ message: "Not found" }, 404);
+  const resolution = await resolveBuilding(id);
+  if (!resolution.ok) return resolutionError(c, id, resolution.reason);
+  const externalId = resolution.externalId;
 
   const rows = await sql`
     SELECT
@@ -54,7 +118,13 @@ product.get("/analysis/:id", rateLimit("analysis3"), async (c) => {
     LIMIT 1
   `;
 
-  if (rows.length === 0) return c.json({ message: "Not found" }, 404);
+  if (rows.length === 0) {
+    return resolutionError(
+      c,
+      externalId,
+      await classifyMissingBuildingData(externalId),
+    );
+  }
 
   c.set("tracker", {
     tenantId: c.get("tenantId"),
@@ -70,8 +140,9 @@ product.get("/analysis/:id", rateLimit("analysis3"), async (c) => {
 // chains and dashboards (issue #985). Same data source, fewer fields.
 product.get("/risk/:id", rateLimit("risk3"), async (c) => {
   const id = c.req.param("id");
-  const externalId = await resolveBuildingExternalId(id);
-  if (!externalId) return c.json({ message: "Not found" }, 404);
+  const resolution = await resolveBuilding(id);
+  if (!resolution.ok) return resolutionError(c, id, resolution.reason);
+  const externalId = resolution.externalId;
 
   const rows = await sql`
     SELECT
@@ -93,7 +164,13 @@ product.get("/risk/:id", rateLimit("risk3"), async (c) => {
     LIMIT 1
   `;
 
-  if (rows.length === 0) return c.json({ message: "Not found" }, 404);
+  if (rows.length === 0) {
+    return resolutionError(
+      c,
+      externalId,
+      await classifyMissingBuildingData(externalId),
+    );
+  }
 
   c.set("tracker", {
     tenantId: c.get("tenantId"),
@@ -110,8 +187,9 @@ product.get("/risk/:id", rateLimit("risk3"), async (c) => {
 // the three component risks; recoveryType overrides them to A,established.
 product.get("/light/:id", rateLimit("light3"), async (c) => {
   const id = c.req.param("id");
-  const externalId = await resolveBuildingExternalId(id);
-  if (!externalId) return c.json({ message: "Not found" }, 404);
+  const resolution = await resolveBuilding(id);
+  if (!resolution.ok) return resolutionError(c, id, resolution.reason);
+  const externalId = resolution.externalId;
 
   const rows = await sql`
     SELECT
@@ -128,7 +206,13 @@ product.get("/light/:id", rateLimit("light3"), async (c) => {
     LIMIT 1
   `;
 
-  if (rows.length === 0) return c.json({ message: "Not found" }, 404);
+  if (rows.length === 0) {
+    return resolutionError(
+      c,
+      externalId,
+      await classifyMissingBuildingData(externalId),
+    );
+  }
 
   const row = rows[0] as {
     restorationCosts: number | null;
@@ -167,8 +251,9 @@ product.get("/light/:id", rateLimit("light3"), async (c) => {
 
 product.get("/statistics/:id", rateLimit("statistics3"), async (c) => {
   const id = c.req.param("id");
-  const neighborhoodId = await resolveNeighborhoodId(id);
-  if (!neighborhoodId) return c.json({ message: "Not found" }, 404);
+  const resolution = await resolveNeighborhood(id);
+  if (!resolution.ok) return resolutionError(c, id, resolution.reason);
+  const neighborhoodId = resolution.neighborhoodId;
 
   // Resolve municipality via neighborhood → district → municipality
   const muniRows = await sql`
@@ -245,12 +330,12 @@ product.get("/statistics/:id", rateLimit("statistics3"), async (c) => {
   ]);
 
   // Track usage
-  const buildingExternalId = await resolveBuildingExternalId(id);
-  if (buildingExternalId) {
+  const building = await resolveBuilding(id);
+  if (building.ok) {
     c.set("tracker", {
       tenantId: c.get("tenantId"),
       product: "statistics3",
-      buildingId: buildingExternalId,
+      buildingId: building.externalId,
       identifier: id,
     });
   }

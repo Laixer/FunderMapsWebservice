@@ -63,6 +63,12 @@ CBS district (`WK*`) and CBS municipality (`GM*`) are deliberately not in `detec
 
 GFM identifiers (`gfm-*`) are intentionally out of scope for v4 and return 404. The `gfm` branch in `detectFormat` is preserved so future GFM-aware paths can pattern-match against it; the corresponding lookup branches return null/404 by design.
 
+### Error Contract
+
+Every non-200 response is `{ code, message }` via `errorJson()` in `src/errors.ts`. `code` is a stable machine-readable string (the `ERROR_CODES` array is the canonical list; `errors.test.ts` enforces MIGRATION.md sync); `message` is human-readable and free to change. Codes: `missing_api_key`/`invalid_api_key` (401), `identifier_invalid`/`address_not_found`/`building_not_found`/`not_a_building`/`no_data_available`/`neighborhood_not_found`/`route_not_found` (404), `rate_limit_exceeded` (429), `internal_server_error` (500). Client-supplied ids echoed in messages go through `clampId()` (64-char cap).
+
+The 404 split exists for issue Laixer/FunderMaps#1002 (NWWI): consumers pick the follow-up from `code` alone — resubmit corrected id (`identifier_invalid`, `address_not_found`), request a QuickScan (`no_data_available`), or nothing (`building_not_found`, `not_a_building` = ligplaats/standplaats). Resolution failures come from `resolveBuilding()`'s discriminated result; pand ids still resolve as identity with **no existence check** (happy path = one query), so when the product query misses, `classifyMissingBuildingData()` does one `geocoder.building` point-lookup to split "unknown building" / "houseboat or mobile home" / "known but no data". `geocoder.address.building_id` stores the BAG external id and can point at `NL.IMBAG.LIGPLAATS.*`/`STANDPLAATS.*` — that prefix is how `not_a_building` is detected at resolve time. Still open from #1002: 200-with-null-risk responses carry no explicit reason, and 404 misses are not tracked server-side (deliberately skipped).
+
 ### Product Tracking
 
 After-response middleware inserts into `application.product_tracker` with 24-hour deduplication per (organization_id, product, building_id). Dedup is keyed on the resolved BAG id so that case/whitespace variants of the same identifier can't produce multiple billable rows in a 24h window. The `identifier` column preserves the raw client-supplied id for observability. Tracking failures are silently caught — never break the response.
@@ -93,6 +99,7 @@ src/
 ├── index.ts        # Hono app, middleware stack, error handler
 ├── config.ts       # DATABASE_URL + PORT (8080), Zod validated
 ├── db.ts           # postgres.js connection with numeric/bigint type parsers
+├── errors.ts       # Non-200 { code, message } contract: ErrorCode union + errorJson/clampId helpers
 ├── auth.ts         # API key middleware (Bearer only; dual-stack UNION ALL across auth_key + apikey)
 ├── geocoder.ts     # ID format detection + resolution functions
 ├── enums.ts        # Canonical enum label sets mirroring pg_enum; doc/db sync checked by enums.test.ts (issue #996)
