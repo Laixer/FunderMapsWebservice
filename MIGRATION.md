@@ -162,6 +162,22 @@ The four 404 "no result" codes are designed so automated integrations (e.g. the 
 
 New codes may be added over time; treat any unlisted `code` on an error status generically based on the HTTP status.
 
+## 7. Every known building carries a risk indication
+
+Since July 2026, the model guarantees that every building known to the model carries **at least one** risk indication. When none of the component risks (`drystandRisk`, `bioInfectionRisk`, `dewateringDepthRisk`) could be computed and no report-derived class exists — typically buildings outside groundwater-model coverage or with an undetermined foundation type — `unclassifiedRisk` contains a construction-year-based estimate:
+
+| Construction year | `unclassifiedRisk` |
+|---|---|
+| before 1970 | `d` |
+| 1970 or later | `b` |
+
+Notes for interpreting responses:
+
+- This fallback is **indicative**: it is a heuristic, not a computed or inspected result. It applies to roughly 0.4% of buildings nationally.
+- The component risk fields themselves stay `null` in this case. More generally, a `null` component risk is **structural, not missing data**: each component only applies to certain foundation types (e.g. `drystandRisk` to wood foundations, `dewateringDepthRisk` to no-pile foundations). Do not infer data quality from individual `null` components.
+- Report-derived `unclassifiedRisk` values always take precedence over the fallback.
+- Consequently, the `no_data_available` error (§6) is rare in practice and mainly occurs for buildings not yet present in the current model snapshot, such as very recent BAG additions.
+
 ## Quick checklist
 
 - [ ] Validate against `https://ws-staging.fundermaps.com/v4/...` before changing your production base URL
