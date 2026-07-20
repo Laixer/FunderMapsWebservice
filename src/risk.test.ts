@@ -88,6 +88,28 @@ const cases: {
     expected: { risk: null, reliability: null },
   },
   {
+    name: "fallback-only building: unclassified risk as indicative component wins over all-null components (#1002)",
+    components: [
+      cmp(null, null),
+      cmp(null, null),
+      cmp(null, null),
+      cmp("d", "indicative"),
+    ],
+    recovery: null,
+    expected: { risk: "d", reliability: "indicative" },
+  },
+  {
+    name: "real component outranks the indicative unclassified fallback (#1002)",
+    components: [
+      cmp("c", "established"),
+      cmp(null, null),
+      cmp(null, null),
+      cmp("d", "indicative"),
+    ],
+    recovery: null,
+    expected: { risk: "c", reliability: "established" },
+  },
+  {
     name: "recovery override beats any worse model risk",
     components: [cmp("e", "established"), cmp("e", "established")],
     recovery: "beam_on_pile",

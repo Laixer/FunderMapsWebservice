@@ -184,7 +184,9 @@ product.get("/risk/:id", rateLimit("risk3"), async (c) => {
 
 // /v4/product/light — minimal output for fast chain integrations
 // (issue #985). overallRisk + overallRiskReliability are derived from
-// the three component risks; recoveryType overrides them to A,established.
+// the three component risks plus the unclassified (construction-year
+// fallback) risk as an indicative-reliability component (issue #1002);
+// recoveryType overrides them to A,established.
 // The component risks and restoration costs are inputs only, never
 // returned — the response is the single verdict (issue #1010).
 product.get("/light/:id", rateLimit("light3"), async (c) => {
@@ -201,6 +203,7 @@ product.get("/light/:id", rateLimit("light3"), async (c) => {
       bio_infection_risk_reliability AS "bioInfectionRiskReliability",
       dewatering_depth_risk AS "dewateringDepthRisk",
       dewatering_depth_risk_reliability AS "dewateringDepthRiskReliability",
+      unclassified_risk     AS "unclassifiedRisk",
       recovery_type         AS "recoveryType"
     FROM data.model_risk_static
     WHERE building_id = ${externalId}
@@ -222,14 +225,19 @@ product.get("/light/:id", rateLimit("light3"), async (c) => {
     bioInfectionRiskReliability: Reliability | null;
     dewateringDepthRisk: Risk | null;
     dewateringDepthRiskReliability: Reliability | null;
+    unclassifiedRisk: Risk | null;
     recoveryType: RecoveryType | null;
   };
 
+  // unclassified_risk carries no reliability pair in the model; it's the
+  // construction-year fallback (issue #1002), so it enters as indicative —
+  // any real component outranks it on the reliability-first ordering.
   const overall = computeOverallRisk(
     [
       { risk: row.drystandRisk, reliability: row.drystandRiskReliability },
       { risk: row.bioInfectionRisk, reliability: row.bioInfectionRiskReliability },
       { risk: row.dewateringDepthRisk, reliability: row.dewateringDepthRiskReliability },
+      { risk: row.unclassifiedRisk, reliability: "indicative" },
     ],
     row.recoveryType,
   );

@@ -63,7 +63,7 @@ Two additional product endpoints are available in v4 with no v3 equivalent.
 
 Field names and semantics are identical to the corresponding fields in `analysis` — note that the reliability fields are `drystandReliability`, `bioInfectionReliability` and `dewateringDepthReliability` (not `…RiskReliability`).
 
-**`/v4/product/light/{id}`** — minimal response for fast integrations. Collapses the three component risks into a single derived `overallRisk` + `overallRiskReliability`. If a `recoveryType` is set on the building (i.e. the foundation has been restored), `overallRisk` is forced to `a` with `established` reliability. Returns: `overallRisk`, `overallRiskReliability` — nothing else (`restorationCosts` and `drystandRisk` were removed from the response per Laixer/FunderMaps#1010).
+**`/v4/product/light/{id}`** — minimal response for fast integrations. Collapses the three component risks plus `unclassifiedRisk` (the construction-year-derived fallback classification) into a single derived `overallRisk` + `overallRiskReliability`. The fallback enters at `indicative` reliability, so it only determines `overallRisk` when no more reliable component risk is present — buildings covered only by the fallback report that class instead of `null`. If a `recoveryType` is set on the building (i.e. the foundation has been restored), `overallRisk` is forced to `a` with `established` reliability. Returns: `overallRisk`, `overallRiskReliability` — nothing else (`restorationCosts` and `drystandRisk` were removed from the response per Laixer/FunderMaps#1010).
 
 ### New in v4: research outcome endpoints
 

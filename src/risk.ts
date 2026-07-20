@@ -2,7 +2,9 @@
 //
 // The model surfaces three independent component risks — drystand,
 // bio-infection and dewatering-depth — each paired with a reliability
-// label. The `light` product collapses them into one `overallRisk` plus
+// label, plus the unclassified construction-year-fallback risk, which
+// the caller passes in as an indicative-reliability component (#1002).
+// The `light` product collapses them into one `overallRisk` plus
 // its `overallRiskReliability`. The priority is _not_ "highest letter
 // wins": a more reliable lower letter beats a less reliable higher one
 // ("C established" > "D indicative"). Reliability rank first, then risk
