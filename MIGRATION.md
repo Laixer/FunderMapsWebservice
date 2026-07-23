@@ -45,6 +45,8 @@ The `/api` prefix is removed and the version changes from `v3` to `v4`.
 | `/v4/product/analysis/{id}` | BAG pand (`NL.IMBAG.PAND.0599100000369041` or 16-digit `0599100000369041`); BAG nummeraanduiding (`NL.IMBAG.NUMMERAANDUIDING.0599200000123456` or 16-/15-digit bare form) |
 | `/v4/product/risk/{id}` | Same as `analysis` |
 | `/v4/product/light/{id}` | Same as `analysis` |
+| `/v4/product/facade_scan/{id}` | Same as `analysis` |
+| `/v4/product/foundation-research/{id}` | Same as `analysis` |
 | `/v4/product/statistics/{id}` | Any of the above, plus CBS neighborhood (`BU03630000`) |
 
 Nummeraanduiding IDs are resolved to their pand before lookup. BAG address-to-building is many-to-one, so two nummeraanduidingen on the same pand return identical analysis and statistics — that's expected, the model is building-level.
@@ -58,6 +60,21 @@ Two additional product endpoints are available in v4 with no v3 equivalent.
 **`/v4/product/risk/{id}`** — a subset of `analysis` for valuation chains and dashboards. Returns: `buildingId`, `foundationType`, `foundationTypeReliability`, `restorationCosts`, `drystandRisk`, `drystandRiskReliability`, `bioInfectionRisk`, `bioInfectionRiskReliability`, `dewateringDepthRisk`, `dewateringDepthRiskReliability`, `recoveryType`.
 
 **`/v4/product/light/{id}`** — minimal response for fast integrations. Collapses the three component risks into a single derived `overallRisk` + `overallRiskReliability`. If a `recoveryType` is set on the building (i.e. the foundation has been restored), `overallRisk` is forced to `a` with `established` reliability. Returns: `restorationCosts`, `drystandRisk`, `overallRisk`, `overallRiskReliability`.
+
+### New in v4: research outcome endpoints
+
+Where `analysis` returns the **model-based** risk assessment, these two endpoints return the summarized outcome of **actually performed research** on the building, where available. They complement `analysis`; they do not replace it.
+
+**`/v4/product/facade_scan/{id}`** — the most recent facade scan (QuickScan) for the building, provided its report is **less than 3 years old**. Returns: `buildingId`, `inquiryId`, `inquiryType` (`facade_scan`), `documentDate` (`YYYY-MM-DD`), `validUntil` (`documentDate` + 3 years), `facadeScanRisk` (`a`–`e`), `settlementSpeed`, `skewedParallelFacade`, `skewedPerpendicularFacade`, `facadeCrack`, `contractor`.
+
+**`/v4/product/foundation-research/{id}`** — the most recent foundation research for the building, provided its report is **less than 5 years old**. Returns: `buildingId`, `inquiryId`, `inquiryType` (`foundation_research`), `documentDate`, `validUntil` (`documentDate` + 5 years), `settlementSpeed`, `skewedParallelFacade`, `skewedPerpendicularFacade`, `facadeCrack`, `overallQuality`, `recoveryAdvised` (boolean), `enforcementTerm`, `contractor`.
+
+Notes for both:
+
+- All fields are nullable except `buildingId`. A `null` means the underlying report did not record that observation.
+- Building-level: a nummeraanduiding resolves to its pand first, so two addresses on the same building return the same outcome — the research is attached to the building, not to one address.
+- "Latest available" = the newest report by `documentDate` of that research type within the freshness window. A building whose only research is older than the window returns `404 no_data_available`, same as a building never researched.
+- The skew/settlement classifications use the same scale (`nil` → `very_big`) and derivation as the public facade-scan map layer; `facadeCrack` is the worst of the four facade crack observations.
 
 Same authentication, ID formats, and error responses as `analysis`.
 
@@ -201,6 +218,13 @@ The values below are the exact, complete label sets of the database enum types t
 | damageCause | `drainage`, `construction_flaw`, `drystand`, `overcharge`, `overcharge_negative_cling`, `negative_cling`, `bio_infection`, `fungus_infection`, `bio_fungus_infection`, `foundation_flaw`, `construction_heave`, `subsidence`, `vegetation`, `gas`, `vibrations`, `partial_foundation_recovery`, `japanese_knotweed`, `groundwater_level_reduction` |
 | inquiryType | `monitoring`, `note`, `quickscan`, `unknown`, `demolition_research`, `second_opinion`, `archive_research`, `architectural_research`, `foundation_advice`, `inspectionpit`, `foundation_research`, `additional_research`, `ground_water_level_research`, `soil_investigation`, `facade_scan` |
 | recoveryType | `table`, `beam_on_pile`, `pile_lowering`, `pile_in_wall`, `injection`, `unknown` |
+| facadeScanRisk | `a`, `b`, `c`, `d`, `e` |
+| settlementSpeed | `nil`, `small`, `mediocre`, `big`, `very_big` |
+| skewedParallelFacade | `nil`, `small`, `mediocre`, `big`, `very_big` |
+| skewedPerpendicularFacade | `nil`, `small`, `mediocre`, `big`, `very_big` |
+| facadeCrack | `none`, `nil`, `small`, `mediocre`, `big` |
+| overallQuality | `bad`, `mediocre`, `tolerable`, `good`, `mediocre_good`, `mediocre_bad` |
+| enforcementTerm | `term05`, `term510`, `term1020`, `term5`, `term10`, `term15`, `term20`, `term25`, `term30`, `term40` |
 
 > **Correction notice (June 2026).** Earlier revisions of this table were incomplete and listed four `inquiryType` values that the API never returns. If you implemented against an earlier revision, update your parsers:
 >
