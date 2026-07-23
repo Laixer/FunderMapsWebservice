@@ -102,12 +102,57 @@ export const RECOVERY_TYPE = [
   "unknown",
 ] as const;
 
+// Research-outcome endpoints (issue Laixer/FunderMaps#1003). The issue
+// text proposed `large`/`very_large`-style labels, but the API serves
+// database labels verbatim — these are the actual pg_enum sets.
+export const ROTATION_TYPE = [
+  "nil",
+  "small",
+  "mediocre",
+  "big",
+  "very_big",
+] as const;
+
+export const CRACK_TYPE = [
+  "none",
+  "nil",
+  "small",
+  "mediocre",
+  "big",
+] as const;
+
+export const FOUNDATION_QUALITY = [
+  "bad",
+  "mediocre",
+  "tolerable",
+  "good",
+  "mediocre_good",
+  "mediocre_bad",
+] as const;
+
+export const ENFORCEMENT_TERM = [
+  "term05",
+  "term510",
+  "term1020",
+  "term5",
+  "term10",
+  "term15",
+  "term20",
+  "term25",
+  "term30",
+  "term40",
+] as const;
+
 export type FoundationType = (typeof FOUNDATION_TYPE)[number];
 export type Reliability = (typeof RELIABILITY)[number];
 export type Risk = (typeof FOUNDATION_RISK)[number];
 export type DamageCause = (typeof DAMAGE_CAUSE)[number];
 export type InquiryType = (typeof INQUIRY_TYPE)[number];
 export type RecoveryType = (typeof RECOVERY_TYPE)[number];
+export type RotationType = (typeof ROTATION_TYPE)[number];
+export type CrackType = (typeof CRACK_TYPE)[number];
+export type FoundationQuality = (typeof FOUNDATION_QUALITY)[number];
+export type EnforcementTerm = (typeof ENFORCEMENT_TERM)[number];
 
 // MIGRATION.md "Enum reference" table rows, keyed by the field name used
 // in the doc. Exported so the doc-sync test covers every set in one loop.
@@ -118,9 +163,19 @@ export const ENUM_REFERENCE: Record<string, readonly string[]> = {
   damageCause: DAMAGE_CAUSE,
   inquiryType: INQUIRY_TYPE,
   recoveryType: RECOVERY_TYPE,
+  facadeScanRisk: FOUNDATION_RISK,
+  settlementSpeed: ROTATION_TYPE,
+  skewedParallelFacade: ROTATION_TYPE,
+  skewedPerpendicularFacade: ROTATION_TYPE,
+  facadeCrack: CRACK_TYPE,
+  overallQuality: FOUNDATION_QUALITY,
+  enforcementTerm: ENFORCEMENT_TERM,
 };
 
 // Postgres enum type behind each documented field, for the DB-sync check.
+// settlementSpeed has no enum column of its own: the raw mm/year float is
+// classified into report.rotation_type labels (same scale as the skew
+// classifications), so that is the type it must stay in sync with.
 export const PG_ENUM_TYPES: Record<string, string> = {
   foundationType: "foundation_type",
   reliability: "reliability",
@@ -128,4 +183,11 @@ export const PG_ENUM_TYPES: Record<string, string> = {
   damageCause: "foundation_damage_cause",
   inquiryType: "inquiry_type",
   recoveryType: "recovery_type",
+  facadeScanRisk: "facade_scan_risk",
+  settlementSpeed: "rotation_type",
+  skewedParallelFacade: "rotation_type",
+  skewedPerpendicularFacade: "rotation_type",
+  facadeCrack: "crack_type",
+  overallQuality: "foundation_quality",
+  enforcementTerm: "enforcement_term",
 };
