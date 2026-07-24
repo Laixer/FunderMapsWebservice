@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { logger } from "hono/logger";
+import { secureHeaders } from "hono/secure-headers";
 import { clampId, errorJson } from "./errors.ts";
 import { env } from "./config.ts";
 import { sql } from "./db.ts";
@@ -35,6 +36,17 @@ export type AppEnv = {
 const app = new Hono<AppEnv>();
 
 app.use("*", logger());
+
+// Security response headers — HSTS, nosniff, frame-options, referrer-policy.
+// Same call as FunderMapsApi's middleware stack, deliberately kept identical
+// so both surfaces answer with the same header set.
+//
+// Safe on this surface: every consumer is server-to-server (API-key auth, no
+// CORS middleware, so browsers can't call us cross-origin anyway), and these
+// headers are browser-enforced only — they change no response body and no
+// status code. In particular `cross-origin-resource-policy: same-origin` does
+// not affect server-side callers like the banks/NWWI integrations.
+app.use("*", secureHeaders());
 
 app.onError((err, c) => {
   console.error(err);
