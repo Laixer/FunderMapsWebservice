@@ -4,6 +4,8 @@
 
 We're upgrading the FunderMaps webservice. You'll need to update your integration to use the new endpoints, authentication, and response format.
 
+**v4 is not a drop-in replacement for v3.** The underlying data and its meaning are unchanged — the same building returns the same assessment — but the wire format changed in ways that will break an unmodified v3 client: enums are strings instead of integers (§3), three statistics structures were flattened (§4), and two analysis fields were removed while one was added (§5). Every difference we know of is documented in this guide; work through the [quick checklist](#quick-checklist) before cutting over. If you find a difference that is *not* listed here, treat it as a defect and report it to us.
+
 ## Test against staging before cutover
 
 The new webservice is live on a staging hostname so you can validate your integration before the production cutover:
@@ -57,7 +59,9 @@ Unrecognized or unresolvable IDs return a `404` with a structured error body —
 
 Two additional product endpoints are available in v4 with no v3 equivalent.
 
-**`/v4/product/risk/{id}`** — a subset of `analysis` for valuation chains and dashboards. Returns: `buildingId`, `foundationType`, `foundationTypeReliability`, `restorationCosts`, `drystandRisk`, `drystandRiskReliability`, `bioInfectionRisk`, `bioInfectionRiskReliability`, `dewateringDepthRisk`, `dewateringDepthRiskReliability`, `recoveryType`.
+**`/v4/product/risk/{id}`** — a subset of `analysis` for valuation chains and dashboards. Returns: `buildingId`, `foundationType`, `foundationTypeReliability`, `restorationCosts`, `inquiryType`, `drystandRisk`, `drystandReliability`, `bioInfectionRisk`, `bioInfectionReliability`, `dewateringDepthRisk`, `dewateringDepthReliability`, `unclassifiedRisk`, `recoveryType`.
+
+Field names and semantics are identical to the corresponding fields in `analysis` — note that the reliability fields are `drystandReliability`, `bioInfectionReliability` and `dewateringDepthReliability` (not `…RiskReliability`).
 
 **`/v4/product/light/{id}`** — minimal response for fast integrations. Collapses the three component risks into a single derived `overallRisk` + `overallRiskReliability`. If a `recoveryType` is set on the building (i.e. the foundation has been restored), `overallRisk` is forced to `a` with `established` reliability. Returns: `restorationCosts`, `drystandRisk`, `overallRisk`, `overallRiskReliability`.
 
@@ -104,6 +108,110 @@ All enum fields return human-readable strings instead of integer codes.
 
 **Action:** Update your parsers to handle string values for all enum fields. The possible values are listed in the reference table at the end of this document.
 
+This affects every enum field in the analysis response: `foundationType`, `damageCause`, `inquiryType`, `recoveryType`, the five `*Reliability` fields (`constructionYearReliability`, `foundationTypeReliability`, `drystandReliability`, `bioInfectionReliability`, `dewateringDepthReliability`), and the four risk fields (`drystandRisk`, `bioInfectionRisk`, `dewateringDepthRisk`, `unclassifiedRisk`).
+
+### v3 integer → v4 string mapping
+
+The underlying values did **not** change — only their encoding. A building that returned `foundationType: 3` from v3 returns `foundationType: "concrete"` from v4 for the same identifier, from the same source data. Use these tables to reconcile historical v3 output with v4 output.
+
+> ⚠️ **Do not derive this mapping from the position of a value in the [enum reference](#enum-reference) table.** That table is ordered by the database's own enum ordering, which is **not** the v3 integer ordering. Mapping by position silently yields `concrete` where v3 said `wood_amsterdam`, and so on. Use the explicit tables below.
+
+**`Reliability`** — applies to all `*Reliability` fields:
+
+| v3 | v4 |
+|----|----|
+| `0` | `indicative` |
+| `1` | `established` |
+| `2` | `cluster` |
+| `3` | `supercluster` |
+
+**`FoundationRisk`** — applies to `drystandRisk`, `bioInfectionRisk`, `dewateringDepthRisk`, `unclassifiedRisk`, and `facadeScanRisk`:
+
+| v3 | v4 |
+|----|----|
+| `0` | `a` |
+| `1` | `b` |
+| `2` | `c` |
+| `3` | `d` |
+| `4` | `e` |
+
+**`foundationType`:**
+
+| v3 | v4 |
+|----|----|
+| `0` | `wood` |
+| `1` | `wood_amsterdam` |
+| `2` | `wood_rotterdam` |
+| `3` | `concrete` |
+| `4` | `no_pile` |
+| `5` | `no_pile_masonry` |
+| `6` | `no_pile_strips` |
+| `7` | `no_pile_bearing_floor` |
+| `8` | `no_pile_concrete_floor` |
+| `9` | `no_pile_slit` |
+| `10` | `wood_charger` |
+| `11` | `weighted_pile` |
+| `12` | `combined` |
+| `13` | `steel_pile` |
+| `14` | `other` |
+| `15` | `wood_rotterdam_amsterdam` |
+| `16` | `wood_rotterdam_arch` |
+| `17` | `wood_amsterdam_arch` |
+
+**`inquiryType`:**
+
+| v3 | v4 |
+|----|----|
+| `0` | `additional_research` |
+| `1` | `monitoring` |
+| `2` | `note` |
+| `3` | `quickscan` |
+| `4` | `unknown` |
+| `5` | `demolition_research` |
+| `6` | `second_opinion` |
+| `7` | `archive_research` |
+| `8` | `architectural_research` |
+| `9` | `foundation_advice` |
+| `10` | `inspectionpit` |
+| `11` | `foundation_research` |
+| `12` | `ground_water_level_research` |
+| `13` | `soil_investigation` |
+| `14` | `facade_scan` |
+
+**`recoveryType`:**
+
+| v3 | v4 |
+|----|----|
+| `0` | `table` |
+| `1` | `beam_on_pile` |
+| `2` | `pile_lowering` |
+| `3` | `pile_in_wall` |
+| `4` | `injection` |
+| `5` | `unknown` |
+
+**`damageCause`** — note that **`7` is not used**; the v3 integer sequence has a gap there. Do not assume contiguous values.
+
+| v3 | v4 |
+|----|----|
+| `0` | `drainage` |
+| `1` | `construction_flaw` |
+| `2` | `drystand` |
+| `3` | `overcharge` |
+| `4` | `overcharge_negative_cling` |
+| `5` | `negative_cling` |
+| `6` | `bio_infection` |
+| `8` | `fungus_infection` |
+| `9` | `bio_fungus_infection` |
+| `10` | `foundation_flaw` |
+| `11` | `construction_heave` |
+| `12` | `subsidence` |
+| `13` | `vegetation` |
+| `14` | `gas` |
+| `15` | `vibrations` |
+| `16` | `partial_foundation_recovery` |
+| `17` | `japanese_knotweed` |
+| `18` | `groundwater_level_reduction` |
+
 ## 4. Statistics response: flattened arrays
 
 Three statistics fields have been simplified from nested objects to flat arrays.
@@ -142,7 +250,23 @@ Note: `yearFrom` is now an integer, `yearTo` is removed, and `totalCount` is ren
 
 Note: categories with 0% are omitted from the array.
 
-## 5. Removed analysis fields
+### Year-count arrays: `totalCount` → `count`
+
+The four year-keyed count arrays keep their field names and their nesting, but the item key `totalCount` is renamed to `count`:
+
+```json
+// Before
+{ "totalIncidentCount": [{ "year": 2024, "totalCount": 7 }] }
+
+// After
+{ "totalIncidentCount": [{ "year": 2024, "count": 7 }] }
+```
+
+This applies to all four: `totalIncidentCount`, `municipalityIncidentCount`, `totalReportCount`, `municipalityReportCount`.
+
+The remaining statistics fields — `dataCollectedPercentage` and `totalBuildingRestoredCount` — are unchanged scalars.
+
+## 5. Analysis response: fields removed and added
 
 Two fields that existed in v3 are **not returned** in v4:
 
@@ -150,6 +274,10 @@ Two fields that existed in v3 are **not returned** in v4:
 - `overallQuality`
 
 Both were dropped because the underlying source column had drifted away from the documented enum semantics. If your integration depended on them, contact us before migrating.
+
+One field is **new** in v4:
+
+- `addressCount` (integer) — the number of addresses (nummeraanduidingen) on this BAG pand. Consumers use it to apportion `restorationCosts` across the individual objects within a single building. Additive: parsers that ignore unknown fields are unaffected.
 
 ## 6. Error responses
 
@@ -194,17 +322,60 @@ Notes for interpreting responses:
 - The component risk fields themselves stay `null` in this case. More generally, a `null` component risk is **structural, not missing data**: each component only applies to certain foundation types (e.g. `drystandRisk` to wood foundations, `dewateringDepthRisk` to no-pile foundations). Do not infer data quality from individual `null` components.
 - Report-derived `unclassifiedRisk` values always take precedence over the fallback.
 - Consequently, the `no_data_available` error (§6) is rare in practice and mainly occurs for buildings not yet present in the current model snapshot, such as very recent BAG additions.
+- **Do not assert on this.** The fallback is derived from the construction year, so a building whose construction year is itself unknown gets no fallback and returns `null` for all four risk fields. In the current snapshot that is exactly 1 building out of 11.2M — but it is not zero, so treat "all risks null" as a case your code handles rather than an impossible state.
 
 ## Quick checklist
 
 - [ ] Validate against `https://ws-staging.fundermaps.com/v4/...` before changing your production base URL
 - [ ] Update authentication: use `Authorization: Bearer fmsk.your_api_key`
 - [ ] Update base URL: drop `/api`, change `v3` to `v4`
-- [ ] Update enum parsing: integers → strings
+- [ ] Update enum parsing: integers → strings — use the [explicit mapping tables](#v3-integer--v4-string-mapping), **not** the position of a value in the enum reference table
 - [ ] Update `foundationTypeDistribution` parsing: read array directly
 - [ ] Update `constructionYearDistribution` parsing: `yearFrom` is an integer, `yearTo` removed, `totalCount` → `count`
 - [ ] Update `foundationRiskDistribution` parsing: read array of objects instead of `percentageA`–`percentageE` keys
+- [ ] Update `totalIncidentCount` / `municipalityIncidentCount` / `totalReportCount` / `municipalityReportCount` parsing: item key `totalCount` → `count`
 - [ ] Remove any reads of `enforcementTerm` / `overallQuality` from the analysis response
+- [ ] Check your response model against the [analysis response reference](#analysis-response-reference) — `addressCount` is new in v4
+- [ ] Confirm your code tolerates `null` in every risk field simultaneously (§7)
+
+## Analysis response reference
+
+The complete field set of `GET /v4/product/analysis/{id}`. Nothing else is returned; any field not listed here is not part of the contract.
+
+"Null share" is the proportion of the 11.2M buildings in the current model snapshot for which the field is `null`. It is guidance for sizing your handling of missing data, not a contract — shares move as the model is rebuilt.
+
+| Field | Type | Null share | Notes |
+|-------|------|-----------|-------|
+| `buildingId` | string | never | BAG pand id, e.g. `NL.IMBAG.PAND.0599100000369041` |
+| `neighborhoodId` | string | <0.1% | Internal FunderMaps neighborhood id, not a CBS `BU*` code |
+| `constructionYear` | integer | <0.1% | Year, not a date |
+| `constructionYearReliability` | `reliability` | never | |
+| `foundationType` | `foundationType` | never | |
+| `foundationTypeReliability` | `reliability` | never | |
+| `restorationCosts` | number | 43% | Euro estimate for the whole building; divide by `addressCount` for a per-object figure |
+| `height` | number | never | Metres |
+| `velocity` | number | 90% | Subsidence rate, mm/year; negative = sinking |
+| `groundWaterLevel` | number | 10% | |
+| `groundLevel` | number | 9% | |
+| `soil` | string | 10% | Free-text soil description, not an enum |
+| `surfaceArea` | number | never | m² |
+| `damageCause` | `damageCause` | >99% | Only set where a report recorded a cause |
+| `inquiryType` | `inquiryType` | 97% | Type of the report backing this building, where one exists |
+| `drystand` | number | 96% | |
+| `drystandRisk` | `foundationRisk` | 53% | |
+| `drystandReliability` | `reliability` | never | |
+| `bioInfectionRisk` | `foundationRisk` | 97% | |
+| `bioInfectionReliability` | `reliability` | never | |
+| `dewateringDepth` | number | 47% | |
+| `dewateringDepthRisk` | `foundationRisk` | 4% | |
+| `dewateringDepthReliability` | `reliability` | never | |
+| `unclassifiedRisk` | `foundationRisk` | 99% | See §7 |
+| `recoveryType` | `recoveryType` | >99% | Set when the foundation has been restored |
+| `addressCount` | integer | never | New in v4; addresses on this pand |
+
+Note the asymmetry in the reliability field names: `constructionYearReliability` and `foundationTypeReliability` are named after their value field, while `drystandReliability`, `bioInfectionReliability` and `dewateringDepthReliability` are **not** `…RiskReliability`. This matches v3 exactly; it is a quirk we preserved deliberately rather than a v4 change.
+
+The `*Reliability` fields have never been `null` in any model snapshot to date, but treat them as nullable anyway — v3's non-nullable integer encoding could not express "unknown", and v4's can.
 
 ## Enum reference
 
