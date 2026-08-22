@@ -262,6 +262,12 @@ product.get("/light/:id", rateLimit("light3"), async (c) => {
 // settlement_speed in mm/year); facadeCrack is the worst of the four
 // facade-crack observations.
 //
+// settlement_speed is entered NEGATIVE (zakking = -mm/yr; the table has
+// CHECK (settlement_speed <= 0) since 2026-08-22). Classify on abs() so the
+// sign can never bucket a sinking house as 'nil' — before this, 1,096 of
+// 1,277 facade-scan settlements were served as 'nil' because the entry
+// conventions were split between authors.
+//
 // Deliberately NOT filtered on audit_status: the facade-scan intake is
 // bulk-imported and sits at pending_review (6.1k of 6.1k) — the public
 // facade_scan map layer serves the same rows without an audit filter, so
@@ -284,11 +290,11 @@ async function latestResearchOutcome(
       to_char(i.document_date + make_interval(years => ${freshnessYears}), 'YYYY-MM-DD') AS "validUntil",
       s.facade_scan_risk::text AS "facadeScanRisk",
       CASE
-        WHEN s.settlement_speed < 0.5 THEN 'nil'
-        WHEN s.settlement_speed < 2   THEN 'small'
-        WHEN s.settlement_speed < 3   THEN 'mediocre'
-        WHEN s.settlement_speed < 4   THEN 'big'
-        WHEN s.settlement_speed >= 4  THEN 'very_big'
+        WHEN abs(s.settlement_speed) < 0.5 THEN 'nil'
+        WHEN abs(s.settlement_speed) < 2   THEN 'small'
+        WHEN abs(s.settlement_speed) < 3   THEN 'mediocre'
+        WHEN abs(s.settlement_speed) < 4   THEN 'big'
+        WHEN abs(s.settlement_speed) >= 4  THEN 'very_big'
       END AS "settlementSpeed",
       COALESCE(s.skewed_parallel_facade, CASE
         WHEN s.skewed_parallel < 75   THEN 'very_big'::report.rotation_type
