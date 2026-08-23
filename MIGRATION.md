@@ -82,6 +82,39 @@ Notes for both:
 
 Same authentication, ID formats, and error responses as `analysis`.
 
+### New in v4: MCP endpoint for AI agents
+
+`POST /v4/mcp` exposes the same products as an [MCP](https://modelcontextprotocol.io) server (Streamable HTTP, stateless, JSON responses), so an AI agent — Claude, ChatGPT, an in-house LLM tool — can call FunderMaps directly with your existing API key. Nothing else changes: the same `Authorization: Bearer fmsk.…` header, the same billing (a tool call is recorded as the corresponding product, with the same 24-hour deduplication), the same rate limits and the same error codes.
+
+Tools:
+
+| Tool | Equivalent REST call | Billed as |
+|---|---|---|
+| `find_building` (`postalCode`, `houseNumber`) | — (address → BAG id lookup) | free |
+| `get_analysis` (`id`) | `GET /v4/product/analysis/{id}` | `analysis3` |
+| `get_risk` (`id`) | `GET /v4/product/risk/{id}` | `risk3` |
+| `get_light` (`id`) | `GET /v4/product/light/{id}` | `light3` |
+| `get_facade_scan` (`id`) | `GET /v4/product/facade_scan/{id}` | `facade_scan4` |
+| `get_foundation_research` (`id`) | `GET /v4/product/foundation-research/{id}` | `foundation_research4` |
+| `get_statistics` (`id`) | `GET /v4/product/statistics/{id}` | `statistics3` |
+| `get_usage` | `GET /v4/usage` | free |
+
+Connecting (Claude Desktop / Claude Code / any Streamable-HTTP client):
+
+```json
+{
+  "mcpServers": {
+    "fundermaps": {
+      "type": "http",
+      "url": "https://ws.fundermaps.com/v4/mcp",
+      "headers": { "Authorization": "Bearer fmsk.your-key" }
+    }
+  }
+}
+```
+
+Tool results carry the REST JSON body both as text and as `structuredContent`; a non-200 REST response becomes a tool error whose text starts with the REST `code` (`no_data_available`, `rate_limit_exceeded`, …) so the agent can pick the same follow-up a REST consumer would. The endpoint is POST-only: `GET`/`DELETE` return `405` because there are no sessions to resume or terminate.
+
 ## 2. Authentication
 
 The only supported authentication method is now a standard Bearer token:

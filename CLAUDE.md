@@ -17,7 +17,7 @@ bun run typecheck    # tsc --noEmit
 
 ## Architecture
 
-3 dependencies: `hono`, `postgres`, `zod`. No ORM — raw SQL via postgres.js tagged templates.
+5 dependencies: `hono`, `postgres`, `zod`, plus `@hono/mcp` + `@modelcontextprotocol/sdk` for the MCP endpoint. No ORM — raw SQL via postgres.js tagged templates.
 
 ### Request Flow
 
@@ -32,7 +32,12 @@ Request → Extract API key (2 methods) → Validate key in DB (60s cache) → R
 - `GET /v4/product/light/:id` — minimal output with a derived `overallRisk`; see `src/risk.ts` for the priority rules and the recovery-type override (issue #985)
 - `GET /v4/product/statistics/:id` — neighborhood statistics (9 parallel queries)
 - `GET /v4/usage` — per-tenant request count stats (daily/monthly/total)
+- `POST /v4/mcp` — MCP server (Streamable HTTP, stateless, JSON responses) exposing every product route as a tool plus a free `find_building` address lookup; see `src/mcp.ts`
 - `GET /health` — health check
+
+### MCP endpoint
+
+`POST /v4/mcp` (`src/mcp.ts`) builds one `McpServer` + `StreamableHTTPTransport` per request (stateless: no session id, `enableJsonResponse`, non-POST → 405). `authMiddleware` runs on the route so an unauthenticated caller gets the normal JSON 401. Each product tool **dispatches in-process** via `app.request("/v4/product/…/:id", { Authorization })` with the caller's own bearer — no duplicated SQL, and auth (60s cache hit), `rateLimit`, the product query and `trackerMiddleware` all run exactly as for a REST call, so billing is identical. Tool results: 200 → body as text + `structuredContent`; non-200 → `isError` with the route's `{ code, message }` (plus `Retry-After` on 429). `find_building` (postal code + house number → `geocoder.address` rows, indexed on `postal_code`) is the only SQL the file owns and is deliberately untracked. Tool catalogue and paths are pinned by `mcp.test.ts`; adding a product route means adding a row to `PRODUCT_TOOLS`.
 
 Each `/v4/product/*` route is wrapped in a `rateLimit(<trackerName>)` middleware that enforces a per-(API key, product) calendar-window limit against `application.api_key_rate_limit`. The unit is **billable events** (post-dedup `product_tracker` rows), not raw requests — same unit we bill on. Absent config row = unlimited. Overage returns 429 + `Retry-After` and emits a one-line JSON `rate_limit_exceeded` log for monitoring. See `src/rate-limit.ts` and issue #8.
 
@@ -106,6 +111,7 @@ src/
 ├── rate-limit.ts   # Per-(key, product) calendar-window rate limit middleware
 ├── risk.ts         # Pure overallRisk computation for /v4/product/light
 ├── tracker.ts      # After-response product tracking middleware
+├── mcp.ts          # POST /v4/mcp — MCP server; tools dispatch in-process to the product routes
 └── routes/
     ├── product.ts  # analysis + statistics endpoints
     └── usage.ts    # /v4/usage endpoint
