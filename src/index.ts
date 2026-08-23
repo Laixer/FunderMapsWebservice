@@ -8,6 +8,7 @@ import { authMiddleware } from "./auth.ts";
 import { trackerMiddleware } from "./tracker.ts";
 import productRoutes from "./routes/product.ts";
 import usageRoutes from "./routes/usage.ts";
+import { mcpHandler } from "./mcp.ts";
 
 const shutdown = async () => {
   console.log("Shutting down...");
@@ -33,7 +34,7 @@ export type AppEnv = {
   };
 };
 
-const app = new Hono<AppEnv>();
+export const app = new Hono<AppEnv>();
 
 app.use("*", logger());
 
@@ -65,6 +66,12 @@ app.route("/v4/product", productRoutes);
 
 app.use("/v4/usage/*", authMiddleware);
 app.route("/v4/usage", usageRoutes);
+
+// MCP endpoint (Streamable HTTP, stateless). Auth runs here so callers get the
+// same JSON 401 as every other route; billing/rate limits run inside the
+// in-process dispatch to the product routes — see src/mcp.ts.
+app.use("/v4/mcp", authMiddleware);
+app.all("/v4/mcp", mcpHandler(app));
 
 app.notFound((c) =>
   errorJson(
