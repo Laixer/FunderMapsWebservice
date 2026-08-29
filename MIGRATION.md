@@ -22,14 +22,14 @@ curl -H "Authorization: Bearer fmsk.your_api_key" \
   "https://ws-staging.fundermaps.com/v4/product/analysis/NL.IMBAG.PAND.1734101000021359"
 ```
 
-When we cut over, the same `/v4/...` paths will be served from `ws.fundermaps.com`. Until then, `ws.fundermaps.com/v4/...` returns 404 — use the staging hostname while migrating.
+`ws.fundermaps.com/v4/...` is the production endpoint. Staging is for trying things out; production traffic should go to `ws.fundermaps.com`.
 
-We'll announce the cutover date separately. After cutover, both hostnames will continue to work for a deprecation window.
+**The old `/api/v3` endpoints were switched off on 2026-08-29** (end-of-life was announced for end of August 2026). Requests to `ws.fundermaps.com/api/v3/...` now return `404`; there is no deprecation window left.
 
 ## 1. Base URL & paths
 
 ```
-# Old
+# Old (switched off 2026-08-29)
 GET https://ws.fundermaps.com/api/v3/product/analysis/{id}
 GET https://ws.fundermaps.com/api/v3/product/statistics/{id}
 

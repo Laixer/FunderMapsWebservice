@@ -53,7 +53,7 @@ Auth is **dual-stack** as of `72a11e3` (Phase B.2 of the apiKey migration):
 
 `resolveKey` issues a single `UNION ALL` joining `organization_user` on both branches and returns at most one row (a plaintext only matches one table). The `source` column ("legacy" vs "ba") routes the fire-and-forget usage UPDATE to the right table. 60s in-memory cache per key (`AUTH_TTL_MS`); cache miss is the only time we hit the DB or bump usage. We deliberately don't pull in `better-auth` as a dependency on this billable surface — the BA hash format is reproduced inline (`sha256Base64Url`).
 
-The legacy branch dies in Phase D once the C# Webservice retires (end of Dec 2026) and `auth_key` drains.
+The legacy branch dies in Phase D once `auth_key` drains (the C# Webservice was retired 2026-08-29; only customer key migration remains).
 
 ### Geocoder ID Resolution
 

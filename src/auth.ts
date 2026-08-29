@@ -56,8 +56,8 @@ async function resolveKey(key: string): Promise<AuthResult | null> {
   // Dual-read across both api-key tables in a single round-trip.
   // - application.auth_key:   legacy table, SHA-256 hex hashes. Holds
   //   every key issued before the @better-auth/api-key plugin landed.
-  //   C# Webservice still reads this directly until Dec 2026; we keep
-  //   honoring those keys here too.
+  //   The C# Webservice that shared this table was retired 2026-08-29;
+  //   the rows stay until customers have moved to fmsk keys.
   // - application.apikey:     Better Auth's plugin table, SHA-256
   //   base64url-no-padding hashes. New keys created via the TS API's
   //   management routes (Phase B.3) land here.
