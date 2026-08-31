@@ -11,7 +11,7 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "dependencies": {
     "@hono/mcp": "^0.3.2",
