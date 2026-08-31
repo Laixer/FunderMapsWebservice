@@ -65,8 +65,8 @@ export const PRODUCT_TOOLS: readonly ProductTool[] = [
     title: "Overall foundation risk (single verdict)",
     path: "/v4/product/light",
     description:
-      "Minimal output with one derived `overallRisk` letter (a–e) for the building, plus the " +
-      "fields it was derived from. Use when you need a single answer. Billable (`light3`).",
+      "Minimal output with one derived `overallRisk` letter (a–e) for the building and its " +
+      "reliability, nothing else. Use when you need a single answer. Billable (`light3`).",
   },
   {
     name: "get_facade_scan",

@@ -185,6 +185,8 @@ product.get("/risk/:id", rateLimit("risk3"), async (c) => {
 // /v4/product/light — minimal output for fast chain integrations
 // (issue #985). overallRisk + overallRiskReliability are derived from
 // the three component risks; recoveryType overrides them to A,established.
+// The component risks and restoration costs are inputs only, never
+// returned — the response is the single verdict (issue #1010).
 product.get("/light/:id", rateLimit("light3"), async (c) => {
   const id = c.req.param("id");
   const resolution = await resolveBuilding(id);
@@ -193,7 +195,6 @@ product.get("/light/:id", rateLimit("light3"), async (c) => {
 
   const rows = await sql`
     SELECT
-      restoration_costs     AS "restorationCosts",
       drystand_risk         AS "drystandRisk",
       drystand_risk_reliability AS "drystandRiskReliability",
       bio_infection_risk    AS "bioInfectionRisk",
@@ -215,7 +216,6 @@ product.get("/light/:id", rateLimit("light3"), async (c) => {
   }
 
   const row = rows[0] as {
-    restorationCosts: number | null;
     drystandRisk: Risk | null;
     drystandRiskReliability: Reliability | null;
     bioInfectionRisk: Risk | null;
@@ -242,8 +242,6 @@ product.get("/light/:id", rateLimit("light3"), async (c) => {
   });
 
   return c.json({
-    restorationCosts: row.restorationCosts,
-    drystandRisk: row.drystandRisk,
     overallRisk: overall.risk,
     overallRiskReliability: overall.reliability,
   });
