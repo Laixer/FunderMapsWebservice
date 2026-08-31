@@ -162,3 +162,37 @@ describe("GET /risk/:id — 404 reason codes (issue #1002)", () => {
     expect(await res.json()).toEqual(RISK_ROW);
   });
 });
+
+// Issue Laixer/FunderMaps#1010: /light is the single verdict and nothing
+// else. restorationCosts and drystandRisk were dropped from the response;
+// the component risks stay in the SQL only as computeOverallRisk inputs.
+describe("GET /light/:id", () => {
+  const LIGHT_ROW = {
+    drystandRisk: "c",
+    drystandRiskReliability: "established",
+    bioInfectionRisk: "b",
+    bioInfectionRiskReliability: "established",
+    dewateringDepthRisk: "a",
+    dewateringDepthRiskReliability: "indicative",
+    recoveryType: "table",
+  };
+
+  test("response carries exactly overallRisk + overallRiskReliability", async () => {
+    queryRows = [LIGHT_ROW];
+    const res = await product.request(`/light/${BAG}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(["overallRisk", "overallRiskReliability"]);
+    // recoveryType set → forced to a, established.
+    expect(body).toEqual({ overallRisk: "a", overallRiskReliability: "established" });
+  });
+
+  test("restoration_costs is no longer selected; component risks still are", async () => {
+    queryRows = [LIGHT_ROW];
+    await product.request(`/light/${BAG}`);
+    expect(capturedQuery).not.toContain("restoration_costs");
+    expect(capturedQuery).toContain('AS "drystandRisk"');
+    expect(capturedQuery).toContain('AS "bioInfectionRisk"');
+    expect(capturedQuery).toContain('AS "dewateringDepthRisk"');
+  });
+});
