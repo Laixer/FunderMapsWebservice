@@ -335,6 +335,7 @@ Every non-200 response has a consistent JSON body:
 | 404 | `route_not_found` | Unknown endpoint path | Check the request path |
 | 429 | `rate_limit_exceeded` | Your per-product usage limit was reached; see the `Retry-After` and `X-RateLimit-*` headers | Retry after the indicated time |
 | 500 | `internal_server_error` | Unexpected server error | Retry later; contact support if it persists |
+| 503 | `service_unavailable` | Health check only (§8): the webservice is up but cannot currently serve product requests | Treat the webservice as unavailable; retry later |
 
 The four 404 "no result" codes are designed so automated integrations (e.g. the NWWI valuation chain) can choose the correct follow-up action from `code` alone: a corrected resubmission (`identifier_invalid`, `address_not_found`), a QuickScan request (`no_data_available`), or no action (`building_not_found`, `not_a_building`).
 
@@ -357,6 +358,27 @@ Notes for interpreting responses:
 - Consequently, the `no_data_available` error (§6) is rare in practice and mainly occurs for buildings not yet present in the current model snapshot, such as very recent BAG additions.
 - **Do not assert on this.** The fallback is derived from the construction year, so a building whose construction year is itself unknown gets no fallback and returns `null` for all four risk fields. In the current snapshot that is exactly 1 building out of 11.2M — but it is not zero, so treat "all risks null" as a case your code handles rather than an impossible state.
 
+## 8. Health check
+
+`GET /v4/health` reports whether the webservice can currently serve product requests. It is **unauthenticated**, never billed, and intended for availability monitors.
+
+```bash
+curl -i https://ws.fundermaps.com/v4/health
+```
+
+| HTTP status | Body | Meaning |
+|-------------|------|---------|
+| 200 | `{ "status": "ok" }` | The webservice is up and can reach its data |
+| 503 | `{ "code": "service_unavailable", "message": "…" }` | The webservice is up but cannot currently serve requests — retry later |
+| anything else, or no response | — | The webservice itself is unreachable |
+
+Treat the **HTTP status** as the contract: `200` means available, anything else means unavailable. The body is informational and deliberately carries no technical detail (no versions, hostnames, or timings).
+
+- Responses carry `Cache-Control: no-store`; every call reflects the current state.
+- The state is re-evaluated at most once every 5 seconds server-side. Once a minute is a sensible polling interval; polling faster does not give fresher answers.
+- A `200` says the service is available, not that a specific building has data — the `404` codes in §6 still apply to product calls.
+- Staging exposes the same endpoint at `https://ws-staging.fundermaps.com/v4/health`.
+
 ## Quick checklist
 
 - [ ] Validate against `https://ws-staging.fundermaps.com/v4/...` before changing your production base URL
@@ -370,6 +392,7 @@ Notes for interpreting responses:
 - [ ] Remove any reads of `enforcementTerm` / `overallQuality` from the analysis response
 - [ ] Check your response model against the [analysis response reference](#analysis-response-reference) — `addressCount` is new in v4
 - [ ] Confirm your code tolerates `null` in every risk field simultaneously (§7)
+- [ ] Point your availability monitor at `GET /v4/health` (§8), not at a billable product call
 
 ## Analysis response reference
 

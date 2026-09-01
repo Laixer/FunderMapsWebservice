@@ -33,7 +33,8 @@ Request → Extract API key (2 methods) → Validate key in DB (60s cache) → R
 - `GET /v4/product/statistics/:id` — neighborhood statistics (9 parallel queries)
 - `GET /v4/usage` — per-tenant request count stats (daily/monthly/total)
 - `POST /v4/mcp` — MCP server (Streamable HTTP, stateless, JSON responses) exposing every product route as a tool plus a free `find_building` address lookup; see `src/mcp.ts`
-- `GET /health` — health check
+- `GET /v4/health` — public readiness check (issue Laixer/FunderMaps#1014): `SELECT 1` through the pool, 2 s timeout, verdict cached 5 s; 200 `{ status: "ok" }` or 503 `service_unavailable`; unauthenticated, never tracked. See `src/health.ts`
+- `GET /health` — liveness for DigitalOcean's probes only (container-direct; the `/v4` ingress rule never exposes it). Dependency-free on purpose: must not fail on a DB blip
 
 ### MCP endpoint
 
@@ -110,10 +111,12 @@ src/
 ├── enums.ts        # Canonical enum label sets mirroring pg_enum; doc/db sync checked by enums.test.ts (issue #996)
 ├── rate-limit.ts   # Per-(key, product) calendar-window rate limit middleware
 ├── risk.ts         # Pure overallRisk computation for /v4/product/light
+├── health.ts       # Readiness probe for /v4/health: cached, timeout-bounded SELECT 1
 ├── tracker.ts      # After-response product tracking middleware
 ├── mcp.ts          # POST /v4/mcp — MCP server; tools dispatch in-process to the product routes
 └── routes/
     ├── product.ts  # analysis + statistics endpoints
+    ├── health.ts   # GET /v4/health — 200 ok / 503 service_unavailable
     └── usage.ts    # /v4/usage endpoint
 ```
 
