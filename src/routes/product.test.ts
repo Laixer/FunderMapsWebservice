@@ -28,6 +28,22 @@ mock.module("../db.ts", () => ({
   },
 }));
 
+// The research endpoints sign a link to the source document (issue
+// Laixer/FunderMapsApi#140). The process-wide linker reads S3_* from the
+// environment, which CI does not set — so swap in one built from dummy
+// credentials. Presigning is local (no network), so the real signing code
+// runs; the omit-vs-present decision is what these tests pin.
+const { createDocumentLinker } = await import("../document.ts");
+mock.module("../document.ts", () => ({
+  sourceDocumentResource: createDocumentLinker({
+    endpoint: "https://ams3.digitaloceanspaces.com",
+    region: "us-east-1",
+    bucket: "fundermaps",
+    accessKeyId: "AKIATEST",
+    secretAccessKey: "secret",
+  }),
+}));
+
 const product = (await import("./product.ts")).default;
 
 const BAG = "NL.IMBAG.PAND.0599100000654061";
@@ -194,5 +210,103 @@ describe("GET /light/:id", () => {
     expect(capturedQuery).toContain('AS "drystandRisk"');
     expect(capturedQuery).toContain('AS "bioInfectionRisk"');
     expect(capturedQuery).toContain('AS "dewateringDepthRisk"');
+  });
+});
+
+// Issue Laixer/FunderMapsApi#140: `resource` = signed link to the source
+// document. Rule A: freshness == the endpoint's data window (3 y / 5 y), so
+// there is no "document too old" case to test — if the row is served, the
+// link is there. No document on file → the key is ABSENT, never null.
+describe("research endpoints — source document `resource` (#140)", () => {
+  const DOC = "8286ef68-9217-4508-b9e2-6d3e9c5a18da.pdf";
+  const RESEARCH_ROW = {
+    buildingId: BAG,
+    inquiryId: 4711,
+    inquiryType: "foundation_research",
+    documentDate: "2024-03-01",
+    validUntil: "2029-03-01",
+    documentFile: DOC,
+    settlementSpeed: "small",
+    skewedParallelFacade: null,
+    skewedPerpendicularFacade: null,
+    facadeCrack: "nil",
+    overallQuality: "mediocre",
+    recoveryAdvised: true,
+    enforcementTerm: "term510",
+    contractor: "Bureau X",
+    facadeScanRisk: null,
+  };
+
+  test("the research query selects document_file", async () => {
+    queryRows = [RESEARCH_ROW];
+    await product.request(`/foundation-research/${BAG}`);
+    expect(capturedQuery).toContain('i.document_file AS "documentFile"');
+    expect(capturedQuery).toContain("FROM report.inquiry i");
+  });
+
+  test("foundation-research: document on file → resource with a 1 h presigned URL", async () => {
+    queryRows = [RESEARCH_ROW];
+    const res = await product.request(`/foundation-research/${BAG}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.resource).toBeDefined();
+    const resource = body.resource as { url: string; expiresAt: string; mediaType: string };
+    const url = new URL(resource.url);
+    expect(url.pathname).toBe(`/fundermaps/inquiry-report/${DOC}`);
+    expect(url.searchParams.get("X-Amz-Expires")).toBe("3600");
+    expect(resource.mediaType).toBe("application/pdf");
+    expect(Date.parse(resource.expiresAt)).toBeGreaterThan(Date.now());
+    // The storage name itself is never exposed as a top-level field.
+    expect("documentFile" in body).toBe(false);
+  });
+
+  test("facade_scan: document on file → resource present", async () => {
+    queryRows = [{ ...RESEARCH_ROW, inquiryType: "facade_scan", facadeScanRisk: "c" }];
+    const res = await product.request(`/facade_scan/${BAG}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.facadeScanRisk).toBe("c");
+    expect((body.resource as { url: string }).url).toContain(`inquiry-report/${DOC}`);
+    expect("documentFile" in body).toBe(false);
+  });
+
+  test("no document on file → `resource` key is omitted entirely (not null)", async () => {
+    for (const documentFile of [null, "", "file"]) {
+      queryRows = [{ ...RESEARCH_ROW, documentFile }];
+      const fr = await product.request(`/foundation-research/${BAG}`);
+      expect(fr.status).toBe(200);
+      const frBody = (await fr.json()) as Record<string, unknown>;
+      expect("resource" in frBody).toBe(false);
+
+      queryRows = [{ ...RESEARCH_ROW, documentFile, inquiryType: "facade_scan" }];
+      const fs = await product.request(`/facade_scan/${BAG}`);
+      expect(fs.status).toBe(200);
+      const fsBody = (await fs.json()) as Record<string, unknown>;
+      expect("resource" in fsBody).toBe(false);
+    }
+  });
+
+  test("the rest of the contract is unchanged by the new field", async () => {
+    queryRows = [RESEARCH_ROW];
+    const res = await product.request(`/foundation-research/${BAG}`);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(
+      [
+        "buildingId",
+        "inquiryId",
+        "inquiryType",
+        "documentDate",
+        "validUntil",
+        "settlementSpeed",
+        "skewedParallelFacade",
+        "skewedPerpendicularFacade",
+        "facadeCrack",
+        "overallQuality",
+        "recoveryAdvised",
+        "enforcementTerm",
+        "contractor",
+        "resource",
+      ].sort(),
+    );
   });
 });

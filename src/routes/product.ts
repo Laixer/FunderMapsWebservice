@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { sql } from "../db.ts";
+import { sourceDocumentResource } from "../document.ts";
 import { clampId, errorJson } from "../errors.ts";
 import {
   classifyMissingBuildingData,
@@ -282,6 +283,11 @@ product.get("/light/:id", rateLimit("light3"), async (c) => {
 // The upper document_date bound guards against future-dated data-entry
 // errors (real examples in prod: 2062, even year 19229) winning "latest"
 // and producing absurd validUntil values.
+//
+// `resource` (issue Laixer/FunderMapsApi#140): a signed link to the source
+// document of the served record. Freshness follows the data window above —
+// no separate document-age rule — and the key is OMITTED (not null) when
+// the dossier has no document on file. See src/document.ts.
 async function latestResearchOutcome(
   externalId: string,
   type: "facade_scan" | "foundation_research",
@@ -294,6 +300,7 @@ async function latestResearchOutcome(
       i.type::text  AS "inquiryType",
       to_char(i.document_date, 'YYYY-MM-DD') AS "documentDate",
       to_char(i.document_date + make_interval(years => ${freshnessYears}), 'YYYY-MM-DD') AS "validUntil",
+      i.document_file AS "documentFile",
       s.facade_scan_risk::text AS "facadeScanRisk",
       CASE
         WHEN abs(s.settlement_speed) < 0.5 THEN 'nil'
@@ -384,6 +391,13 @@ async function researchNotFound(
   );
 }
 
+// Spread into the response: `{ resource }` when the record has a source
+// document, `{}` otherwise — so the key is absent rather than null.
+function withResource(documentFile: string | null) {
+  const resource = sourceDocumentResource(documentFile);
+  return resource ? { resource } : {};
+}
+
 product.get("/facade_scan/:id", rateLimit("facade_scan4"), async (c) => {
   const id = c.req.param("id");
   const resolution = await resolveBuilding(id);
@@ -414,6 +428,7 @@ product.get("/facade_scan/:id", rateLimit("facade_scan4"), async (c) => {
     skewedPerpendicularFacade: row.skewedPerpendicularFacade,
     facadeCrack: row.facadeCrack,
     contractor: row.contractor,
+    ...withResource(row.documentFile),
   });
 });
 
@@ -456,6 +471,7 @@ product.get(
       recoveryAdvised: row.recoveryAdvised,
       enforcementTerm: row.enforcementTerm,
       contractor: row.contractor,
+      ...withResource(row.documentFile),
     });
   },
 );

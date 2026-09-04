@@ -69,13 +69,27 @@ Field names and semantics are identical to the corresponding fields in `analysis
 
 Where `analysis` returns the **model-based** risk assessment, these two endpoints return the summarized outcome of **actually performed research** on the building, where available. They complement `analysis`; they do not replace it.
 
-**`/v4/product/facade_scan/{id}`** — the most recent facade scan (QuickScan) for the building, provided its report is **less than 3 years old**. Returns: `buildingId`, `inquiryId`, `inquiryType` (`facade_scan`), `documentDate` (`YYYY-MM-DD`), `validUntil` (`documentDate` + 3 years), `facadeScanRisk` (`a`–`e`), `settlementSpeed`, `skewedParallelFacade`, `skewedPerpendicularFacade`, `facadeCrack`, `contractor`.
+**`/v4/product/facade_scan/{id}`** — the most recent facade scan (QuickScan) for the building, provided its report is **less than 3 years old**. Returns: `buildingId`, `inquiryId`, `inquiryType` (`facade_scan`), `documentDate` (`YYYY-MM-DD`), `validUntil` (`documentDate` + 3 years), `facadeScanRisk` (`a`–`e`), `settlementSpeed`, `skewedParallelFacade`, `skewedPerpendicularFacade`, `facadeCrack`, `contractor`, `resource` (optional, see below).
 
-**`/v4/product/foundation-research/{id}`** — the most recent foundation research for the building, provided its report is **less than 5 years old**. Returns: `buildingId`, `inquiryId`, `inquiryType` (`foundation_research`), `documentDate`, `validUntil` (`documentDate` + 5 years), `settlementSpeed`, `skewedParallelFacade`, `skewedPerpendicularFacade`, `facadeCrack`, `overallQuality`, `recoveryAdvised` (boolean), `enforcementTerm`, `contractor`.
+**`/v4/product/foundation-research/{id}`** — the most recent foundation research for the building, provided its report is **less than 5 years old**. Returns: `buildingId`, `inquiryId`, `inquiryType` (`foundation_research`), `documentDate`, `validUntil` (`documentDate` + 5 years), `settlementSpeed`, `skewedParallelFacade`, `skewedPerpendicularFacade`, `facadeCrack`, `overallQuality`, `recoveryAdvised` (boolean), `enforcementTerm`, `contractor`, `resource` (optional, see below).
 
 Notes for both:
 
 - All fields are nullable except `buildingId`. A `null` means the underlying report did not record that observation.
+- **`resource` — the source document.** A link to the original report (normally a PDF) the outcome was taken from:
+
+  ```json
+  "resource": {
+    "url": "https://ams3.digitaloceanspaces.com/…/inquiry-report/8286ef68-….pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&…",
+    "expiresAt": "2026-09-04T13:00:00.000Z",
+    "mediaType": "application/pdf"
+  }
+  ```
+
+  - `url` is a **signed, short-lived link**: it works for **1 hour** from the moment of the response (`expiresAt`, ISO-8601 UTC), for anyone who holds it, with no further authentication. Fetch the document promptly; do not persist the URL — re-request the product to get a fresh one. Retrieving the document is not a separate billable call.
+  - **Freshness follows the data window.** The link is included whenever the record itself is served: within 3 years for `facade_scan`, within 5 years for `foundation-research`. There is no separate age limit on the document.
+  - **Absent, never `null`.** When the record has no source document on file, the `resource` key is **omitted from the response entirely**. Check for presence (`"resource" in body`), not for `null`.
+  - `mediaType` is almost always `application/pdf`; a handful of legacy dossiers hold an image instead.
 - Building-level: a nummeraanduiding resolves to its pand first, so two addresses on the same building return the same outcome — the research is attached to the building, not to one address.
 - "Latest available" = the newest report by `documentDate` of that research type within the freshness window. A building whose only research is older than the window returns `404 no_data_available`, same as a building never researched.
 - The skew/settlement classifications use the same scale (`nil` → `very_big`) and derivation as the public facade-scan map layer; `facadeCrack` is the worst of the four facade crack observations.

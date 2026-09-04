@@ -74,7 +74,8 @@ export const PRODUCT_TOOLS: readonly ProductTool[] = [
     path: "/v4/product/facade_scan",
     description:
       "Outcome of the most recent FunderMaps façade scan (QuickScan) for the building within the " +
-      "last 3 years, if any: observed damage and the resulting façade risk. Billable (`facade_scan4`).",
+      "last 3 years, if any: observed damage and the resulting façade risk, plus a 1-hour signed " +
+      "link to the source PDF (`resource`) when one is on file. Billable (`facade_scan4`).",
   },
   {
     name: "get_foundation_research",
@@ -82,7 +83,8 @@ export const PRODUCT_TOOLS: readonly ProductTool[] = [
     path: "/v4/product/foundation-research",
     description:
       "Outcome of the most recent documented foundation research (funderingsonderzoek) for the " +
-      "building, if any: type, damage cause, recovery advice, contractor. Billable (`foundation_research4`).",
+      "building within the last 5 years, if any: type, damage cause, recovery advice, contractor, " +
+      "plus a 1-hour signed link to the source PDF (`resource`) when one is on file. Billable (`foundation_research4`).",
   },
   {
     name: "get_statistics",
