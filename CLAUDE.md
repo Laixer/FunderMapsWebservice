@@ -17,7 +17,7 @@ bun run typecheck    # tsc --noEmit
 
 ## Architecture
 
-5 dependencies: `hono`, `postgres`, `zod`, plus `@hono/mcp` + `@modelcontextprotocol/sdk` for the MCP endpoint. No ORM — raw SQL via postgres.js tagged templates.
+5 dependencies: `hono`, `postgres`, `zod`, plus `@hono/mcp` + `@modelcontextprotocol/sdk` for the MCP endpoint. No ORM — raw SQL via postgres.js tagged templates. Object storage goes through Bun's built-in `S3Client` (presign only, no SDK).
 
 ### Request Flow
 
@@ -30,6 +30,7 @@ Request → Extract API key (2 methods) → Validate key in DB (60s cache) → R
 - `GET /v4/product/analysis/:id` — building risk analysis
 - `GET /v4/product/risk/:id` — subset of `analysis` for valuation chains and dashboards (issue #985)
 - `GET /v4/product/light/:id` — minimal output with a derived `overallRisk`; see `src/risk.ts` for the priority rules and the recovery-type override (issue #985)
+- `GET /v4/product/facade_scan/:id` / `GET /v4/product/foundation-research/:id` — latest research outcome within 3 y / 5 y (issue Laixer/FunderMaps#1003), plus an optional `resource` (signed 1 h link to the source PDF; issue Laixer/FunderMapsApi#140 — see "Source document link")
 - `GET /v4/product/statistics/:id` — neighborhood statistics (9 parallel queries)
 - `GET /v4/usage` — per-tenant request count stats (daily/monthly/total)
 - `POST /v4/mcp` — MCP server (Streamable HTTP, stateless, JSON responses) exposing every product route as a tool plus a free `find_building` address lookup; see `src/mcp.ts`
@@ -41,6 +42,15 @@ Request → Extract API key (2 methods) → Validate key in DB (60s cache) → R
 `POST /v4/mcp` (`src/mcp.ts`) builds one `McpServer` + `StreamableHTTPTransport` per request (stateless: no session id, `enableJsonResponse`, non-POST → 405). `authMiddleware` runs on the route so an unauthenticated caller gets the normal JSON 401. Each product tool **dispatches in-process** via `app.request("/v4/product/…/:id", { Authorization })` with the caller's own bearer — no duplicated SQL, and auth (60s cache hit), `rateLimit`, the product query and `trackerMiddleware` all run exactly as for a REST call, so billing is identical. Tool results: 200 → body as text + `structuredContent`; non-200 → `isError` with the route's `{ code, message }` (plus `Retry-After` on 429). `find_building` (postal code + house number → `geocoder.address` rows, indexed on `postal_code`) is the only SQL the file owns and is deliberately untracked. Tool catalogue and paths are pinned by `mcp.test.ts`; adding a product route means adding a row to `PRODUCT_TOOLS`.
 
 Each `/v4/product/*` route is wrapped in a `rateLimit(<trackerName>)` middleware that enforces a per-(API key, product) calendar-window limit against `application.api_key_rate_limit`. The unit is **billable events** (post-dedup `product_tracker` rows), not raw requests — same unit we bill on. Absent config row = unlimited. Overage returns 429 + `Retry-After` and emits a one-line JSON `rate_limit_exceeded` log for monitoring. See `src/rate-limit.ts` and issue #8.
+
+### Source document link (`resource`)
+
+The two research endpoints attach `resource: { url, expiresAt, mediaType }` — a presigned GET on `inquiry-report/<report.inquiry.document_file>` in the private bucket, valid for `DOCUMENT_LINK_TTL_SECONDS` (1 h). `src/document.ts` owns it. Rules, decided in Laixer/FunderMapsApi#140 (Yorick, 2026-09-04, "option A"):
+
+- **Freshness = the data window.** Record served ⇒ link included. No separate document-age rule (the issue's "max 2 years" clause was overruled); never add a date filter here.
+- **Omit, never null.** No document on file ⇒ the `resource` key is absent. "No document" = `document_file` NULL/empty or not a `<uuid>.<ext>` storage name — prod carries the literal placeholder `file` on ~110 legacy foundation-research rows whose upload never happened.
+- Signing is local (Bun `S3Client.presign`, SigV4) — no object-storage round trip on the billable path, and existence is not verified per request.
+- Config: `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` — identical names/values to FunderMapsApi. **All optional on purpose:** unset ⇒ the service boots and serves everything as before, `resource` is omitted and one `source_document_storage_not_configured` JSON line is logged per process. So a deploy without the env can never 500 a product call — but it silently under-delivers the NWWI contract; set the env before shipping.
 
 ### Authentication
 
@@ -103,9 +113,10 @@ After-response middleware inserts into `application.product_tracker` with 24-hou
 ```
 src/
 ├── index.ts        # Hono app, middleware stack, error handler
-├── config.ts       # DATABASE_URL + PORT (8080), Zod validated
+├── config.ts       # DATABASE_URL + PORT (8080) + optional S3_* (source documents), Zod validated
 ├── db.ts           # postgres.js connection with numeric/bigint type parsers
 ├── errors.ts       # Non-200 { code, message } contract: ErrorCode union + errorJson/clampId helpers
+├── document.ts     # `resource` on the research endpoints: presigned 1 h link to the source PDF (issue FunderMapsApi#140)
 ├── auth.ts         # API key middleware (Bearer only; dual-stack UNION ALL across auth_key + apikey)
 ├── geocoder.ts     # ID format detection + resolution functions
 ├── enums.ts        # Canonical enum label sets mirroring pg_enum; doc/db sync checked by enums.test.ts (issue #996)
@@ -115,7 +126,7 @@ src/
 ├── tracker.ts      # After-response product tracking middleware
 ├── mcp.ts          # POST /v4/mcp — MCP server; tools dispatch in-process to the product routes
 └── routes/
-    ├── product.ts  # analysis + statistics endpoints
+    ├── product.ts  # analysis/risk/light + facade_scan/foundation-research + statistics endpoints
     ├── health.ts   # GET /v4/health — 200 ok / 503 service_unavailable
     └── usage.ts    # /v4/usage endpoint
 ```
