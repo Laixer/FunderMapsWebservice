@@ -25,10 +25,10 @@ describe("errorJson", () => {
 
 // Same sync discipline as enums.test.ts: the consumer-facing docs must
 // list every code the API can emit. A code added to ERROR_CODES without a
-// row in the MIGRATION.md error-responses table fails here.
-describe("MIGRATION.md sync", () => {
-  test("every error code is documented in MIGRATION.md", async () => {
-    const doc = await Bun.file(new URL("../MIGRATION.md", import.meta.url)).text();
+// row in the API.md error-responses table fails here.
+describe("API.md sync", () => {
+  test("every error code is documented in API.md", async () => {
+    const doc = await Bun.file(new URL("../API.md", import.meta.url)).text();
     for (const code of ERROR_CODES) {
       expect(doc).toContain(`\`${code}\``);
     }

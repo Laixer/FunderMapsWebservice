@@ -1,19 +1,19 @@
 import { describe, test, expect } from "bun:test";
 import { ENUM_REFERENCE, PG_ENUM_TYPES } from "./enums.ts";
 
-// Issue #996: the enum reference in MIGRATION.md drifted from what the
+// Issue #996: the enum reference in API.md drifted from what the
 // API actually returns, and integrators built parsers against the wrong
 // values. The API passes database enum labels through verbatim, so there
 // are two links that can break:
 //
-//   pg_enum  ←→  src/enums.ts  ←→  MIGRATION.md
+//   pg_enum  ←→  src/enums.ts  ←→  API.md
 //
 // The doc↔code link is checked on every CI run. The code↔db link needs a
 // real database, which CI doesn't have — run it on demand:
 //
 //   ENUM_DB_CHECK=1 DATABASE_URL=postgres://... bun test src/enums.test.ts
 
-// Extracts the value list for one field from the MIGRATION.md enum table.
+// Extracts the value list for one field from the API.md enum table.
 // Matches rows of the form: | fieldName | `a`, `b`, ... |
 function docValues(markdown: string, field: string): string[] {
   const row = markdown
@@ -23,9 +23,9 @@ function docValues(markdown: string, field: string): string[] {
   return [...row.matchAll(/`([^`]+)`/g)].map((m) => m[1]!);
 }
 
-describe("MIGRATION.md enum reference matches src/enums.ts", async () => {
+describe("API.md enum reference matches src/enums.ts", async () => {
   const markdown = await Bun.file(
-    new URL("../MIGRATION.md", import.meta.url),
+    new URL("../API.md", import.meta.url),
   ).text();
 
   for (const [field, values] of Object.entries(ENUM_REFERENCE)) {

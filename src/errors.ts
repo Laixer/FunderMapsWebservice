@@ -18,7 +18,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 // pointless); no_data_available → request a QuickScan;
 // internal_server_error → retry later.
 //
-// Every code must appear in the MIGRATION.md error-responses table —
+// Every code must appear in the API.md error-responses table —
 // errors.test.ts enforces the sync.
 export const ERROR_CODES = [
   "missing_api_key", // 401 — no Authorization: Bearer header
