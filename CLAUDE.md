@@ -54,7 +54,7 @@ The two research endpoints attach `resource: { url, expiresAt, mediaType }` — 
 
 ### Authentication
 
-API-key only. Single delivery method: `Authorization: Bearer fmsk.xxx`. Legacy `Authorization: authkey` and `?authkey=` were removed in `9485134`; `X-API-Key` in `257d98e` (see MIGRATION.md).
+API-key only. Single delivery method: `Authorization: Bearer fmsk.xxx`. Legacy `Authorization: authkey` and `?authkey=` were removed in `9485134`; `X-API-Key` in `257d98e` (see API.md).
 
 No role checks. Key existence in either api-key table = authorized.
 
@@ -81,7 +81,7 @@ GFM identifiers (`gfm-*`) are intentionally out of scope for v4 and return 404. 
 
 ### Error Contract
 
-Every non-200 response is `{ code, message }` via `errorJson()` in `src/errors.ts`. `code` is a stable machine-readable string (the `ERROR_CODES` array is the canonical list; `errors.test.ts` enforces MIGRATION.md sync); `message` is human-readable and free to change. Codes: `missing_api_key`/`invalid_api_key` (401), `identifier_invalid`/`address_not_found`/`building_not_found`/`not_a_building`/`no_data_available`/`neighborhood_not_found`/`route_not_found` (404), `rate_limit_exceeded` (429), `internal_server_error` (500). Client-supplied ids echoed in messages go through `clampId()` (64-char cap).
+Every non-200 response is `{ code, message }` via `errorJson()` in `src/errors.ts`. `code` is a stable machine-readable string (the `ERROR_CODES` array is the canonical list; `errors.test.ts` enforces API.md sync); `message` is human-readable and free to change. Codes: `missing_api_key`/`invalid_api_key` (401), `identifier_invalid`/`address_not_found`/`building_not_found`/`not_a_building`/`no_data_available`/`neighborhood_not_found`/`route_not_found` (404), `rate_limit_exceeded` (429), `internal_server_error` (500). Client-supplied ids echoed in messages go through `clampId()` (64-char cap).
 
 The 404 split exists for issue Laixer/FunderMaps#1002 (NWWI): consumers pick the follow-up from `code` alone — resubmit corrected id (`identifier_invalid`, `address_not_found`), request a QuickScan (`no_data_available`), or nothing (`building_not_found`, `not_a_building` = ligplaats/standplaats). Resolution failures come from `resolveBuilding()`'s discriminated result; pand ids still resolve as identity with **no existence check** (happy path = one query), so when the product query misses, `classifyMissingBuildingData()` does one `geocoder.building` point-lookup to split "unknown building" / "houseboat or mobile home" / "known but no data". `geocoder.address.building_id` stores the BAG external id and can point at `NL.IMBAG.LIGPLAATS.*`/`STANDPLAATS.*` — that prefix is how `not_a_building` is detected at resolve time. Still open from #1002: 200-with-null-risk responses carry no explicit reason, and 404 misses are not tracked server-side (deliberately skipped).
 

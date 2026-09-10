@@ -15,13 +15,13 @@
 //
 // This file is the single source of truth on the TS side. Two checks in
 // enums.test.ts keep it honest:
-//   1. (always, CI) the enum reference table in MIGRATION.md must list
+//   1. (always, CI) the enum reference table in API.md must list
 //      exactly these values — the doc cannot drift from this file.
 //   2. (ENUM_DB_CHECK=1, needs a real DATABASE_URL) these arrays must
 //      match pg_enum — this file cannot drift from the database.
 //
 // If a label is added to a Postgres enum, run the DB check against that
-// database, add the label here, and update MIGRATION.md; check 1 fails
+// database, add the label here, and update API.md; check 1 fails
 // in CI until the doc is updated too.
 
 export const FOUNDATION_TYPE = [
@@ -154,7 +154,7 @@ export type CrackType = (typeof CRACK_TYPE)[number];
 export type FoundationQuality = (typeof FOUNDATION_QUALITY)[number];
 export type EnforcementTerm = (typeof ENFORCEMENT_TERM)[number];
 
-// MIGRATION.md "Enum reference" table rows, keyed by the field name used
+// API.md "Enum reference" table rows, keyed by the field name used
 // in the doc. Exported so the doc-sync test covers every set in one loop.
 export const ENUM_REFERENCE: Record<string, readonly string[]> = {
   foundationType: FOUNDATION_TYPE,

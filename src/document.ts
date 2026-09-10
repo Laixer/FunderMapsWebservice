@@ -14,7 +14,7 @@
 //
 // Omit semantics: when the dossier has no document on file, the `resource`
 // key is absent from the response — never `null`. The consumer's check is
-// `"resource" in body`, and the field list in MIGRATION.md says so.
+// `"resource" in body`, and the field list in API.md says so.
 //
 // Storage layout mirrors FunderMapsApi (src/lib/document-file.ts) and the
 // retired C# stack: `report.inquiry.document_file` holds only the storage
