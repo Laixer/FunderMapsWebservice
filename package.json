@@ -18,6 +18,6 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "hono": "^4.13.7",
     "postgres": "^3.4.9",
-    "zod": "^4.6.1"
+    "zod": "^4.6.4"
   }
 }
