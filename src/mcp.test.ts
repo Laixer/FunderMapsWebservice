@@ -281,6 +281,24 @@ describe("POST /v4/mcp", () => {
     expect(capturedQueries.some((q) => q.includes("FROM data.model_risk_static"))).toBe(true);
   });
 
+  test("an unsupported protocol version → the SDK's own 4xx, not a 500 (#44)", async () => {
+    queryQueue = [KEY_ROW, []];
+    const res = await app.request("/v4/mcp", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+        Authorization: "Bearer fmsk.valid-d",
+        "mcp-protocol-version": "1999-01-01",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/list" }),
+    });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+    const out = (await res.json()) as { error: { message: string } };
+    expect(out.error.message).toContain("Unsupported protocol version");
+  });
+
   test("GET /v4/mcp (SSE stream) is refused — stateless server", async () => {
     queryQueue = [KEY_ROW, []];
     const res = await app.request("/v4/mcp", {
