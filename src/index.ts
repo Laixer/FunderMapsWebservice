@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { clampId, errorJson } from "./errors.ts";
@@ -52,6 +53,10 @@ app.use("*", logger());
 app.use("*", secureHeaders());
 
 app.onError((err, c) => {
+  // A deliberate HTTP answer thrown by a library keeps its own status and body.
+  // @hono/mcp throws one for an unsupported MCP protocol version, which
+  // otherwise reached the client as a generic 500 (issue #44).
+  if (err instanceof HTTPException) return err.getResponse();
   console.error(err);
   return errorJson(
     c,
