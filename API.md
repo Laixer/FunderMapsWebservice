@@ -294,6 +294,22 @@ The values below are the exact, complete label sets of the database enum types t
 >
 > Additionally, 8 `foundationType` values, 5 `damageCause` values, and 4 further `inquiryType` values (`archive_research`, `ground_water_level_research`, `soil_investigation`, `facade_scan`) were missing and have been added above. Treat any enum value outside this table as a defect and report it to us.
 
+### Recommended Dutch labels
+
+The words FunderMaps itself uses for these values, in its reports, its mails and the Studio. Showing your users the same words keeps a valuation, a report and a melding saying the same thing. This is a recommendation, not part of the contract: the values above are the contract.
+
+- **foundationType**: `wood` houten palen · `wood_amsterdam` houten palen (Amsterdamse fundering) · `wood_rotterdam` houten palen (Rotterdamse fundering) · `wood_rotterdam_amsterdam` houten palen (Rotterdamse/Amsterdamse fundering) · `wood_rotterdam_arch` houten palen (Rotterdamse fundering met spaarboog) · `wood_amsterdam_arch` houten palen (Amsterdamse fundering met spaarboog) · `wood_charger` houten palen met betonoplanger · `concrete` betonnen palen · `steel_pile` stalen buispalen · `weighted_pile` verzwaarde-puntpalen · `no_pile` ondiepe fundering (op staal) · `no_pile_masonry` ondiepe fundering, gemetseld · `no_pile_strips` ondiepe fundering, stroken · `no_pile_bearing_floor` ondiepe fundering, plaatfundering · `no_pile_concrete_floor` ondiepe fundering, betonvloer · `no_pile_slit` ondiepe fundering, slieten · `combined` gecombineerde fundering · `other` overig
+- **reliability**: `established` vastgesteld · `cluster` afgeleid · `supercluster` afgeleid · `indicative` indicatief
+- **foundationRisk**: `a` A (geen risico) · `b` B (laag risico) · `c` C (verhoogd risico) · `d` D (hoog risico) · `e` E (aanzienlijk hoog risico)
+- **facadeScanRisk**: `a` A · `b` B · `c` C · `d` D · `e` E (in words: A/B laag, C midden, D/E hoog)
+- **overallQuality**: `good` goed · `mediocre_good` matig tot goed · `tolerable` redelijk · `mediocre` matig · `mediocre_bad` matig tot slecht · `bad` slecht
+- **enforcementTerm**: `term05` 0-5 jaar · `term510` 5-10 jaar · `term1020` 10-20 jaar · `term5` 5 jaar · `term10` 10 jaar · `term15` 15 jaar · `term20` 20 jaar · `term25` 25 jaar · `term30` 30 jaar · `term40` 40 jaar
+- **damageCause**: `drainage` ontwatering · `construction_flaw` constructiefout · `drystand` droogstand · `overcharge` overbelasting · `overcharge_negative_cling` overbelasting door negatieve kleef · `negative_cling` negatieve kleef · `bio_infection` bacteriële aantasting · `fungus_infection` schimmelaantasting · `bio_fungus_infection` bacteriële aantasting en schimmelaantasting · `foundation_flaw` funderingsgebrek · `construction_heave` opbolling door de constructie · `subsidence` zetting · `vegetation` boomwortels / vegetatie · `gas` gaswinning · `vibrations` trillingen · `partial_foundation_recovery` gedeeltelijk funderingsherstel · `japanese_knotweed` Japanse duizendknoop · `groundwater_level_reduction` grondwaterstandverlaging
+- **inquiryType**: `foundation_research` funderingsonderzoek · `facade_scan` Verkennend Funderingsonderzoek (QuickScan addendum) · `quickscan` QuickScan (vervallen) · `archive_research` archiefonderzoek · `inspectionpit` inspectieput · `monitoring` monitoring · `ground_water_level_research` grondwateronderzoek · `soil_investigation` grondonderzoek · `architectural_research` bouwkundig onderzoek · `foundation_advice` funderingsadvies · `second_opinion` second opinion · `demolition_research` sloop- of nieuwbouwonderzoek · `additional_research` aanvullend onderzoek · `note` notitie · `unknown` onbekend
+- **recoveryType**: `table` tafelconstructie · `beam_on_pile` balk op paal · `pile_lowering` paalverlaging · `pile_in_wall` paal in wand · `injection` injectie · `unknown` onbekend
+- **settlementSpeed, skewedParallelFacade, skewedPerpendicularFacade**: `nil` nihil · `small` klein · `mediocre` middelmatig · `big` groot · `very_big` zeer groot
+- **facadeCrack**: `none` geen · `nil` geen · `small` licht · `mediocre` matig · `big` ernstig
+
 ## Appendix: coming from v3
 
 `/api/v3` was retired on 2026-08-29. The data and its meaning did not change between v3 and v4 — the same building returns the same assessment — but the wire format did. This appendix exists so historical v3 output can be reconciled with v4; nothing in it is needed for a new integration.
