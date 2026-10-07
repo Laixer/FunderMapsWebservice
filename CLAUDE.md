@@ -124,6 +124,7 @@ src/
 ├── risk.ts         # Pure overallRisk computation for /v4/product/light
 ├── health.ts       # Readiness probe for /v4/health: cached, timeout-bounded SELECT 1
 ├── tracker.ts      # After-response product tracking middleware
+├── version.ts      # Delivery stamp on /v4/product/*: modelVersion + calculatedAt (body on 200 objects) + X-FunderMaps-Version header; 60 s cache, fail-soft (#47)
 ├── mcp.ts          # POST /v4/mcp — MCP server; tools dispatch in-process to the product routes
 └── routes/
     ├── product.ts  # analysis/risk/light + facade_scan/foundation-research + statistics endpoints

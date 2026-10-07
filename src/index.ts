@@ -12,6 +12,7 @@ import usageRoutes from "./routes/usage.ts";
 import { healthRoutes } from "./routes/health.ts";
 import { databaseReady } from "./health.ts";
 import { mcpHandler } from "./mcp.ts";
+import { versionMiddleware } from "./version.ts";
 
 const shutdown = async () => {
   console.log("Shutting down...");
@@ -74,7 +75,8 @@ app.get("/health", (c) => c.json({ status: "ok" }));
 // Unauthenticated and outside /v4/product/*, so never tracked or billed.
 app.route("/v4/health", healthRoutes(databaseReady));
 
-app.use("/v4/product/*", authMiddleware, trackerMiddleware);
+// versionMiddleware stamps every delivery with the model run it came from (#47).
+app.use("/v4/product/*", authMiddleware, trackerMiddleware, versionMiddleware);
 app.route("/v4/product", productRoutes);
 
 app.use("/v4/usage/*", authMiddleware);

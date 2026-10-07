@@ -28,6 +28,10 @@ mock.module("./db.ts", () => ({
 
 const { buildMcpServer, PRODUCT_TOOLS, toToolResult, findBuilding } = await import("./mcp.ts");
 const { app } = await import("./index.ts");
+// The delivery stamp (#47) would read db.sql and consume a row from the
+// ordered queue below; it has its own suite (version.test.ts).
+const { setVersionLoader } = await import("./version.ts");
+setVersionLoader(async () => null);
 
 beforeEach(() => {
   queryQueue = [];

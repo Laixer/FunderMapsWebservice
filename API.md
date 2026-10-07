@@ -249,6 +249,22 @@ Treat the **HTTP status** as the contract: `200` means available, anything else 
 - A `200` says the service is available, not that a specific building has data — the `404` codes in §5 still apply to product calls.
 - Staging exposes the same endpoint at `https://ws-staging.fundermaps.com/v4/health`.
 
+## 8. Version of a delivery
+
+Every product response says which model produced it and when that model run finished. Store it next to the answer: it is how you tell one delivery from the next.
+
+| Field | Example | Meaning |
+|-------|---------|---------|
+| `modelVersion` | `"model-2024.1"` | The FunderMaps model that produced the answer. Changes only when a new model goes live. |
+| `calculatedAt` | `"2026-10-06T19:59:49.011Z"` | When that model run finished (ISO 8601, UTC). The model is recalculated daily. |
+
+- Both fields are added to the body of every `200` product response (`/v4/product/*`), next to the existing fields. They are the same for every building within one model run.
+- Every product response, including the `404` and `429` ones, also carries the header `X-FunderMaps-Version: <modelVersion>@<calculatedAt>`, so you can compare without parsing the body.
+- **Compare `calculatedAt`.** Equal value: the same inputs, so the same answer for the same building. A new value means the model ran again. The answer for your building *may* have changed, also when nothing was reported about the building itself, because the model takes information from neighbouring buildings into account.
+- For the research endpoints (`facade_scan`, `foundation-research`) the stamp marks the data publication; the research itself carries its own `documentDate`.
+- The stamp is never a reason for an error. If it cannot be determined, the response is served without it: treat the fields as optional.
+- The stamp is part of the response, not a separate product: it is not billed.
+
 ## Enum reference
 
 The values below are the exact, complete label sets of the database enum types the API serves from — every value a v4 response can contain is listed, and a CI check keeps this table in sync with the implementation (`src/enums.ts`). All enum fields are nullable: expect `null` when the underlying data point is absent.
