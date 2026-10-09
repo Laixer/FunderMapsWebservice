@@ -201,7 +201,7 @@ Every non-200 response has a consistent JSON body:
 | 404 | `route_not_found` | Unknown endpoint path | Check the request path |
 | 429 | `rate_limit_exceeded` | Your per-product usage limit was reached; see the `Retry-After` and `X-RateLimit-*` headers | Retry after the indicated time |
 | 500 | `internal_server_error` | Unexpected server error | Retry later; contact support if it persists |
-| 503 | `service_unavailable` | Health check only (§7): the webservice is up but cannot currently serve product requests | Treat the webservice as unavailable; retry later |
+| 503 | `service_unavailable` | The webservice is temporarily unable to serve requests, for example during maintenance. Product and usage requests carry a `Retry-After` header; the health check (§7) reports the same state with this code | Retry after the number of seconds in `Retry-After` |
 
 The four 404 "no result" codes are designed so automated integrations (e.g. the NWWI valuation chain) can choose the correct follow-up action from `code` alone: a corrected resubmission (`identifier_invalid`, `address_not_found`), a QuickScan request (`no_data_available`), or no action (`building_not_found`, `not_a_building`).
 

@@ -13,6 +13,12 @@ import { healthRoutes } from "./routes/health.ts";
 import { databaseReady } from "./health.ts";
 import { mcpHandler } from "./mcp.ts";
 import { versionMiddleware } from "./version.ts";
+import {
+  DATABASE_RETRY_AFTER_SECONDS,
+  handleUnhandledRejection,
+  isDatabaseUnavailable,
+  logDatabaseUnavailable,
+} from "./db-errors.ts";
 
 const shutdown = async () => {
   console.log("Shutting down...");
@@ -22,6 +28,13 @@ const shutdown = async () => {
 
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
+
+// A database blip must not take the process down — see src/db-errors.ts.
+// Only when running as the server: tests import this module and keep the
+// test runner's own unhandled-rejection reporting.
+if (import.meta.main) {
+  process.on("unhandledRejection", (reason) => handleUnhandledRejection(reason));
+}
 
 export type AppEnv = {
   Variables: {
@@ -58,6 +71,22 @@ app.onError((err, c) => {
   // @hono/mcp throws one for an unsupported MCP protocol version, which
   // otherwise reached the client as a generic 500 (issue #44).
   if (err instanceof HTTPException) return err.getResponse();
+  // The database dropped out from under the request (failover, maintenance):
+  // not a bug in this request, so 503 with a retry hint rather than a 500.
+  // Nothing was billed — the tracker only runs for a handler that succeeded.
+  if (isDatabaseUnavailable(err)) {
+    logDatabaseUnavailable("request", err, {
+      method: c.req.method,
+      path: clampId(new URL(c.req.url).pathname),
+    });
+    c.header("Retry-After", String(DATABASE_RETRY_AFTER_SECONDS));
+    return errorJson(
+      c,
+      503,
+      "service_unavailable",
+      `The service is temporarily unavailable. Retry after ${DATABASE_RETRY_AFTER_SECONDS} seconds.`,
+    );
+  }
   console.error(err);
   return errorJson(
     c,
