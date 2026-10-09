@@ -81,9 +81,19 @@ GFM identifiers (`gfm-*`) are intentionally out of scope for v4 and return 404. 
 
 ### Error Contract
 
-Every non-200 response is `{ code, message }` via `errorJson()` in `src/errors.ts`. `code` is a stable machine-readable string (the `ERROR_CODES` array is the canonical list; `errors.test.ts` enforces API.md sync); `message` is human-readable and free to change. Codes: `missing_api_key`/`invalid_api_key` (401), `identifier_invalid`/`address_not_found`/`building_not_found`/`not_a_building`/`no_data_available`/`neighborhood_not_found`/`route_not_found` (404), `rate_limit_exceeded` (429), `internal_server_error` (500). Client-supplied ids echoed in messages go through `clampId()` (64-char cap).
+Every non-200 response is `{ code, message }` via `errorJson()` in `src/errors.ts`. `code` is a stable machine-readable string (the `ERROR_CODES` array is the canonical list; `errors.test.ts` enforces API.md sync); `message` is human-readable and free to change. Codes: `missing_api_key`/`invalid_api_key` (401), `identifier_invalid`/`address_not_found`/`building_not_found`/`not_a_building`/`no_data_available`/`neighborhood_not_found`/`route_not_found` (404), `rate_limit_exceeded` (429), `internal_server_error` (500), `service_unavailable` (503). Client-supplied ids echoed in messages go through `clampId()` (64-char cap).
 
 The 404 split exists for issue Laixer/FunderMaps#1002 (NWWI): consumers pick the follow-up from `code` alone — resubmit corrected id (`identifier_invalid`, `address_not_found`), request a QuickScan (`no_data_available`), or nothing (`building_not_found`, `not_a_building` = ligplaats/standplaats). Resolution failures come from `resolveBuilding()`'s discriminated result; pand ids still resolve as identity with **no existence check** (happy path = one query), so when the product query misses, `classifyMissingBuildingData()` does one `geocoder.building` point-lookup to split "unknown building" / "houseboat or mobile home" / "known but no data". `geocoder.address.building_id` stores the BAG external id and can point at `NL.IMBAG.LIGPLAATS.*`/`STANDPLAATS.*` — that prefix is how `not_a_building` is detected at resolve time. Still open from #1002: 200-with-null-risk responses carry no explicit reason, and 404 misses are not tracked server-side (deliberately skipped).
+
+### Database blips
+
+A managed-PG failover or maintenance makes the database (via DO's PgBouncer) unreachable for seconds. That must cost a few 503s, never the process — on 2026-10-08 it cost a restart: PgBouncer answered `FATAL 08P01 server login has been failing ... (server_login_retry)`, postgres.js rejected both the request's query (a 500) and its own un-awaited `fetchArrayTypes()` lookup, and the second, unhandled rejection made Bun exit. Three layers, all in or around `src/db-errors.ts`:
+
+- **`fetch_types: false`** in `src/db.ts` removes that un-awaited lookup (and one round-trip per new connection). Nothing here reads or binds a Postgres array; if a query ever needs one, return `to_json(col)` rather than turning the option back on.
+- **`app.onError`** answers any error `isDatabaseUnavailable()` recognises (SQLSTATE class `08`, `57P01`–`57P03`, `53300`; postgres.js `CONNECTION_*`/`CONNECT_TIMEOUT`; socket/DNS `E*` codes) with `503 service_unavailable` + `Retry-After: 10` and one `database_unavailable` JSON log line. A query error (wrong SQL, missing relation) stays a 500. Nothing is billed: handlers set the tracker only after their last query.
+- **`unhandledRejection` guard**, installed only when `src/index.ts` is the entrypoint: a stray connectivity rejection is logged and the process keeps serving (the pool reconnects on its own); any other unhandled rejection still prints and exits 1.
+
+`src/db.test.ts` pins the first layer end to end: it runs the real `src/db.ts` in a child process against a fake PgBouncer that reproduces the failover, and fails on any unhandled rejection.
 
 ### Product Tracking
 
@@ -114,7 +124,8 @@ After-response middleware inserts into `application.product_tracker` with 24-hou
 src/
 ├── index.ts        # Hono app, middleware stack, error handler
 ├── config.ts       # DATABASE_URL + PORT (8080) + optional S3_* (source documents), Zod validated
-├── db.ts           # postgres.js connection with numeric/bigint type parsers
+├── db.ts           # postgres.js connection with numeric/bigint type parsers; fetch_types off (see Database blips)
+├── db-errors.ts    # Database-unavailable classification: 503 mapping + unhandledRejection guard
 ├── errors.ts       # Non-200 { code, message } contract: ErrorCode union + errorJson/clampId helpers
 ├── document.ts     # `resource` on the research endpoints: presigned 1 h link to the source PDF (issue FunderMapsApi#140)
 ├── auth.ts         # API key middleware (Bearer only; dual-stack UNION ALL across auth_key + apikey)

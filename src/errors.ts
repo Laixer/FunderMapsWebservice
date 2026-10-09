@@ -32,7 +32,7 @@ export const ERROR_CODES = [
   "rate_limit_exceeded", // 429 — per-(key, product) billing-event limit hit
   "route_not_found", // 404 — unknown endpoint
   "internal_server_error", // 500 — unhandled exception
-  "service_unavailable", // 503 — GET /v4/health: up, but cannot reach the database
+  "service_unavailable", // 503 — database briefly unreachable (any route, with Retry-After; src/db-errors.ts), or GET /v4/health's "unavailable"
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
