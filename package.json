@@ -15,9 +15,9 @@
   },
   "dependencies": {
     "@hono/mcp": "^0.3.2",
-    "@modelcontextprotocol/sdk": "^1.32.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "hono": "^4.13.13",
     "postgres": "^3.4.9",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   }
 }
