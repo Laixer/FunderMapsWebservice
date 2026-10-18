@@ -48,7 +48,7 @@ Unrecognized or unresolvable IDs return a `404` with a structured error body —
 
 Field names and semantics are identical to the corresponding fields in `analysis` — note that the reliability fields are `drystandReliability`, `bioInfectionReliability` and `dewateringDepthReliability` (not `…RiskReliability`).
 
-**`/v4/product/light/{id}`** — minimal response for fast integrations. Collapses the three component risks plus `unclassifiedRisk` (the construction-year-derived fallback classification) into a single derived `overallRisk` + `overallRiskReliability`. The fallback enters at `indicative` reliability, so it only determines `overallRisk` when no more reliable component risk is present — buildings covered only by the fallback report that class instead of `null`. If a `recoveryType` is set on the building (i.e. the foundation has been restored), `overallRisk` is forced to `a` with `established` reliability. Returns: `overallRisk`, `overallRiskReliability` — nothing else (`restorationCosts` and `drystandRisk` were removed from the response per Laixer/FunderMaps#1010).
+**`/v4/product/light/{id}`** — minimal response for fast integrations. Collapses the three component risks plus `unclassifiedRisk` into a single derived `overallRisk` + `overallRiskReliability`. The construction-year fallback (§6) enters at `indicative` reliability, so it only determines `overallRisk` when no more reliable component risk is present — buildings covered only by the fallback report that class instead of `null`. If a `recoveryType` is set on the building (i.e. the foundation has been restored), `overallRisk` is forced to `a` with `established` reliability. Returns: `overallRisk`, `overallRiskReliability` — nothing else (`restorationCosts` and `drystandRisk` were removed from the response per Laixer/FunderMaps#1010).
 
 ### Research outcome endpoints
 
@@ -128,7 +128,7 @@ No other delivery method (query parameter, custom header) is accepted. Keys are 
 
 The complete field set of `GET /v4/product/analysis/{id}`. Nothing else is returned; any field not listed here is not part of the contract.
 
-"Null share" is the proportion of the 11.2M buildings in the current model snapshot for which the field is `null`. It is guidance for sizing your handling of missing data, not a contract — shares move as the model is rebuilt.
+"Null share" is the proportion of the 11.3M buildings in the current model snapshot for which the field is `null`. It is guidance for sizing your handling of missing data, not a contract — shares move as the model is rebuilt.
 
 | Field | Type | Null share | Notes |
 |-------|------|-----------|-------|
@@ -140,9 +140,9 @@ The complete field set of `GET /v4/product/analysis/{id}`. Nothing else is retur
 | `foundationTypeReliability` | `reliability` | never | |
 | `restorationCosts` | number | 43% | Euro estimate for the whole building; divide by `addressCount` for a per-object figure |
 | `height` | number | never | Metres |
-| `velocity` | number | 90% | Subsidence rate, mm/year; negative = sinking |
-| `groundWaterLevel` | number | 10% | |
-| `groundLevel` | number | 9% | |
+| `velocity` | number | 91% | Subsidence rate, mm/year; negative = sinking |
+| `groundWaterLevel` | number | 11% | |
+| `groundLevel` | number | 5% | |
 | `soil` | string | 10% | Free-text soil description, not an enum |
 | `surfaceArea` | number | never | m² |
 | `damageCause` | `damageCause` | >99% | Only set where a report recorded a cause |
@@ -213,9 +213,16 @@ Usage limits are set per API key and product as a number of billable events per 
 
 ## 6. Every known building carries a risk indication
 
-Since July 2026, the model guarantees that every building known to the model carries **at least one** risk indication. When none of the component risks (`drystandRisk`, `bioInfectionRisk`, `dewateringDepthRisk`) could be computed and no report-derived class exists — typically buildings outside groundwater-model coverage or with an undetermined foundation type — `unclassifiedRisk` contains a construction-year-based estimate:
+Since July 2026, the model guarantees that every building known to the model carries **at least one** risk indication. When none of the component risks (`drystandRisk`, `bioInfectionRisk`, `dewateringDepthRisk`) could be computed and no report-derived class exists — typically buildings outside groundwater-model coverage or with an undetermined foundation type — the model fills in a construction-year-based estimate.
 
-| Construction year | `unclassifiedRisk` |
+Where that estimate appears depends on the model version:
+
+- **Model 2026.3** (current): in `dewateringDepthRisk`, with `dewateringDepthReliability` = `indicative`. `unclassifiedRisk` then stays `null`; it only carries a class derived from research (a report or QuickScan on the building, or a report in the same block).
+- **Model 2024.1** (previous): in `unclassifiedRisk`; the component risks stay `null`.
+
+The estimate itself is the same in both versions:
+
+| Construction year | Estimate |
 |---|---|
 | before 1970 | `d` |
 | 1970 or later | `b` |
@@ -223,10 +230,10 @@ Since July 2026, the model guarantees that every building known to the model car
 Notes for interpreting responses:
 
 - This fallback is **indicative**: it is a heuristic, not a computed or inspected result. It applies to roughly 0.4% of buildings nationally.
-- The component risk fields themselves stay `null` in this case. More generally, a `null` component risk is **structural, not missing data**: each component only applies to certain foundation types (e.g. `drystandRisk` to wood foundations, `dewateringDepthRisk` to no-pile foundations). Do not infer data quality from individual `null` components.
-- Report-derived `unclassifiedRisk` values always take precedence over the fallback.
+- Apart from where the estimate lands (see above), the component risk fields stay `null` in this case. More generally, a `null` component risk is **structural, not missing data**: each component only applies to certain foundation types (e.g. `drystandRisk` to wood foundations, `dewateringDepthRisk` to no-pile foundations). Do not infer data quality from individual `null` components.
+- Report-derived values always take precedence over the fallback.
 - Consequently, the `no_data_available` error (§5) is rare in practice and mainly occurs for buildings not yet present in the current model snapshot, such as very recent BAG additions.
-- **Do not assert on this.** The fallback is derived from the construction year, so a building whose construction year is itself unknown gets no fallback and returns `null` for all four risk fields. In the current snapshot that is exactly 1 building out of 11.2M — but it is not zero, so treat "all risks null" as a case your code handles rather than an impossible state.
+- **Do not assert on this.** The fallback is derived from the construction year, so a building whose construction year is itself unknown gets no fallback and returns `null` for all four risk fields. In the current snapshot no building out of 11.3M is in that state, but it can occur, so treat "all risks null" as a case your code handles rather than an impossible state.
 
 ## 7. Health check
 
