@@ -255,7 +255,7 @@ Every product response says which model produced it and when that model run fini
 
 | Field | Example | Meaning |
 |-------|---------|---------|
-| `modelVersion` | `"model-2024.1"` | The FunderMaps model that produced the answer. Changes only when a new model goes live. |
+| `modelVersion` | `"model-2026.3"` | The FunderMaps model that produced the answer. Changes only when a new model goes live. |
 | `calculatedAt` | `"2026-10-06T19:59:49.011Z"` | When that model run finished (ISO 8601, UTC). The model is recalculated daily. |
 
 - Both fields are added to the body of every `200` product response (`/v4/product/*`), next to the existing fields. They are the same for every building within one model run.
