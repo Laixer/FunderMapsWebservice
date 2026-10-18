@@ -12,7 +12,7 @@ import { sql } from "./db.ts";
  * answer.
  *
  *   modelVersion  the default model's slug (data.model_version.is_default),
- *                 which is what data.model_risk_static serves; today model-2024.1
+ *                 which is what data.model_risk_static serves
  *   calculatedAt  when the last successful model refresh finished
  *                 (data.refresh_log, job refresh_data_model, status ok), ISO 8601 UTC
  *
