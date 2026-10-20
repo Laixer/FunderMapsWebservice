@@ -15,7 +15,8 @@ mock.module("./db.ts", () => ({
   },
 }));
 
-const { currentVersion, resetVersionCache, versionMiddleware, VERSION_HEADER } = await import("./version.ts");
+const { currentVersion, loadVersion, setVersionLoader, resetVersionCache, versionMiddleware, VERSION_HEADER } =
+  await import("./version.ts");
 
 const ROW = [{ slug: "model-2024.1", at: new Date("2026-10-06T19:59:49.855Z") }];
 
@@ -23,6 +24,8 @@ beforeEach(() => {
   queryQueue = [];
   fail = false;
   calls = 0;
+  // mcp.test.ts swaps the lookup for a stub for the whole process; when it runs first, put the real one back.
+  setVersionLoader(loadVersion);
   resetVersionCache();
 });
 
