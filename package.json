@@ -10,13 +10,13 @@
     "typecheck": "bun run --bun tsc --noEmit"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.3",
+    "@types/bun": "^1.4.4",
     "typescript": "^7.0.2"
   },
   "dependencies": {
     "@hono/mcp": "^0.3.2",
-    "@modelcontextprotocol/sdk": "^1.32.1",
-    "hono": "^4.13.13",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "hono": "^4.13.14",
     "postgres": "^3.4.9",
     "zod": "^4.6.7"
   }
