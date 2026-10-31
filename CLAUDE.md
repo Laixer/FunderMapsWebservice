@@ -101,7 +101,7 @@ After-response middleware inserts into `application.product_tracker` with 24-hou
 
 ### Key Database Tables/Views
 
-- `data.model_risk_static` — main analysis view. Keyed by `building_id` (BAG, e.g. `NL.IMBAG.PAND.*`). `neighborhood_id` column holds the GFM neighborhood id.
+- `data.model_risk_static` — main analysis view. Keyed by `building_id` (BAG, e.g. `NL.IMBAG.PAND.*`). `neighborhood_id` column holds the GFM neighborhood id. The analysis response returns it unchanged as `neighborhoodId` and adds `neighborhoodCode` (the CBS `BU*` code, a primary-key lookup on `geocoder.neighborhood`), so consumers can move before the gfm id is retired (FunderMapsWorker#158; no breaking change — the consumers that read it confirm first).
 - `data.statistics_product_*` — 9 statistics views (all keyed by GFM neighborhood_id or municipality_id)
 - `application.auth_key` — legacy API keys (SHA-256 hex hash of plaintext; `key_hash` + `user_id`; `last_used` bumped fire-and-forget on cache miss)
 - `application.apikey` — Better Auth plugin API keys (SHA-256 base64url-no-padding hash; `key` + `reference_id` (=user_id); `last_request` + `request_count` bumped on cache miss)

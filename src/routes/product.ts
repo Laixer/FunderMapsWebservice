@@ -86,6 +86,12 @@ product.get("/analysis/:id", rateLimit("analysis3"), async (c) => {
     SELECT
       building_id           AS "buildingId",
       neighborhood_id       AS "neighborhoodId",
+      -- The CBS buurtcode (BU + 8 digits) of the same neighbourhood. Added next
+      -- to the internal neighborhoodId so consumers can move to the public code
+      -- before the internal id is retired (FunderMapsWorker#158; no breaking
+      -- change, 2026-09-18). One primary-key lookup.
+      (SELECT n.external_id FROM geocoder.neighborhood n WHERE n.id = m.neighborhood_id)
+                            AS "neighborhoodCode",
       construction_year     AS "constructionYear",
       construction_year_reliability AS "constructionYearReliability",
       foundation_type       AS "foundationType",
@@ -114,7 +120,7 @@ product.get("/analysis/:id", rateLimit("analysis3"), async (c) => {
       -- building (see issue #988). Precomputed in the view (== count of
       -- geocoder.address rows for this building_id).
       address_count         AS "addressCount"
-    FROM data.model_risk_static
+    FROM data.model_risk_static m
     WHERE building_id = ${externalId}
     LIMIT 1
   `;
