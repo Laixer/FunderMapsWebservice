@@ -133,7 +133,8 @@ The complete field set of `GET /v4/product/analysis/{id}`. Nothing else is retur
 | Field | Type | Null share | Notes |
 |-------|------|-----------|-------|
 | `buildingId` | string | never | BAG pand id, e.g. `NL.IMBAG.PAND.0599100000369041` |
-| `neighborhoodId` | string | <0.1% | Internal FunderMaps neighborhood id, not a CBS `BU*` code |
+| `neighborhoodId` | string | <0.1% | Internal FunderMaps neighborhood id, not a CBS `BU*` code. Use `neighborhoodCode` instead: this id will be retired, with notice in advance |
+| `neighborhoodCode` | string | <0.1% | CBS buurtcode of the same neighbourhood, `BU` + 8 digits, e.g. `BU05990110`. Accepted as `{id}` by `/v4/product/statistics` |
 | `constructionYear` | integer | <0.1% | Year, not a date |
 | `constructionYearReliability` | `reliability` | never | |
 | `foundationType` | `foundationType` | never | |

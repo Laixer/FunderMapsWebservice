@@ -179,6 +179,36 @@ describe("GET /risk/:id — 404 reason codes (issue #1002)", () => {
   });
 });
 
+// FunderMapsWorker#158: analysis carries the CBS buurtcode next to the
+// internal neighborhoodId, which stays unchanged until consumers have moved.
+describe("GET /analysis/:id — neighborhoodCode", () => {
+  const ANALYSIS_ROW = {
+    buildingId: BAG,
+    neighborhoodId: "gfm-0123456789abcdef0123456789abcdef",
+    neighborhoodCode: "BU05990110",
+    foundationType: "wood",
+  };
+
+  test("returns neighborhoodCode next to neighborhoodId", async () => {
+    queryRows = [ANALYSIS_ROW];
+    const res = await product.request(`/analysis/${BAG}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.neighborhoodId).toBe(ANALYSIS_ROW.neighborhoodId);
+    expect(body.neighborhoodCode).toBe("BU05990110");
+  });
+
+  test("selects both keys, the code from geocoder.neighborhood by the row's own neighborhood_id", async () => {
+    queryRows = [ANALYSIS_ROW];
+    await product.request(`/analysis/${BAG}`);
+    expect(capturedQuery).toContain('AS "neighborhoodId"');
+    expect(capturedQuery).toContain('AS "neighborhoodCode"');
+    expect(capturedQuery).toContain("FROM geocoder.neighborhood n WHERE n.id = m.neighborhood_id");
+    expect(capturedQuery).toContain("FROM data.model_risk_static m");
+    expect(capturedQuery).toContain("WHERE building_id =");
+  });
+});
+
 // Issue Laixer/FunderMaps#1010: /light is the single verdict and nothing
 // else. restorationCosts and drystandRisk were dropped from the response;
 // the component risks stay in the SQL only as computeOverallRisk inputs.
