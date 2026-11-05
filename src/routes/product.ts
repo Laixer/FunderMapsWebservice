@@ -365,8 +365,6 @@ async function latestResearchOutcome(
     LEFT JOIN application.contractor con ON con.id = a.contractor_id
     WHERE s.building_id = ${externalId}
       AND i.type = ${type}::report.inquiry_type
-      AND i.delete_date IS NULL
-      AND s.delete_date IS NULL
       AND i.document_date > CURRENT_DATE - make_interval(years => ${freshnessYears})
       AND i.document_date <= CURRENT_DATE + interval '3 months'
     ORDER BY i.document_date DESC, s.create_date DESC
