@@ -1,12 +1,17 @@
-// Per-(API key, product) billing-event rate limiting for /v4/product/*
-// (issue #8). The unit being limited is "billable events" — rows in
+// Per-(organization, product) billing-event rate limiting for /v4/product/*
+// (issues #8, #16). The unit being limited is "billable events" — rows in
 // application.product_tracker, post-dedup. A customer hitting the same
 // building 100× within 24h produces one tracker row and so consumes
 // one unit, matching the pricing model.
 //
-// Limits live in application.api_key_rate_limit, one row per (api_key,
-// product) pair. Absence of a row = unlimited. Period is calendar-aligned
-// UTC (resets at UTC midnight for 'day', first-of-month UTC for 'month').
+// Limits live in application.organization_rate_limit, one row per
+// (organization, product) pair, so every key of an organization shares them.
+// Absence of a row = unlimited. Period is calendar-aligned UTC (resets at UTC
+// midnight for 'day', first-of-month UTC for 'month').
+//
+// The count comes from application.product_tracker_count, which a trigger on
+// product_tracker keeps per UTC day: at most 31 rows to read, whatever the
+// customer's volume.
 //
 // Behaviour on overage: 429 + Retry-After + X-RateLimit-* headers + a
 // structured log line for monitoring pipelines.
@@ -31,8 +36,8 @@ interface CachedConfig {
 const CONFIG_TTL_MS = 60_000;
 const configCache = new Map<string, CachedConfig>();
 
-function cacheKey(apiKeyId: string, source: string, product: string): string {
-  return `${source}|${apiKeyId}|${product}`;
+function cacheKey(tenantId: string, product: string): string {
+  return `${tenantId}|${product}`;
 }
 
 export function clearRateLimitCache(): void {
@@ -82,22 +87,19 @@ export function decide(
 }
 
 async function resolveConfig(
-  apiKeyId: string,
-  source: string,
+  tenantId: string,
   product: string,
 ): Promise<RateLimitConfig | null> {
   const now = Date.now();
-  const key = cacheKey(apiKeyId, source, product);
+  const key = cacheKey(tenantId, product);
   const cached = configCache.get(key);
   if (cached && cached.expiresAt > now) return cached.config;
 
   const rows = await sql`
     SELECT period, limit_count
-    FROM application.api_key_rate_limit
-    WHERE api_key_id = ${apiKeyId}
-      AND source = ${source}
+    FROM application.organization_rate_limit
+    WHERE organization_id = ${tenantId}
       AND product = ${product}
-    LIMIT 1
   `;
 
   const config: RateLimitConfig | null =
@@ -117,12 +119,13 @@ async function countInWindow(
   product: string,
   since: Date,
 ): Promise<number> {
+  // `since` is 00:00 UTC, so its date is the first day of the window.
   const rows = await sql`
-    SELECT count(*)::int AS count
-    FROM application.product_tracker
+    SELECT coalesce(sum(count), 0)::int AS count
+    FROM application.product_tracker_count
     WHERE organization_id = ${tenantId}
       AND product = ${product}
-      AND create_date >= ${since}
+      AND day >= ${since.toISOString().slice(0, 10)}
   `;
   return (rows[0]?.count as number) ?? 0;
 }
@@ -132,11 +135,11 @@ export const rateLimit = (product: string) =>
     const apiKeyId = c.get("apiKeyId");
     const apiKeySource = c.get("apiKeySource");
     const tenantId = c.get("tenantId");
-    // authMiddleware always sets these before we run; guard anyway so a
+    // authMiddleware always sets this before we run; guard anyway so a
     // misconfigured route ordering can't turn a 429 into a 500.
-    if (!apiKeyId || !apiKeySource || !tenantId) return next();
+    if (!tenantId) return next();
 
-    const config = await resolveConfig(apiKeyId, apiKeySource, product);
+    const config = await resolveConfig(tenantId, product);
     if (!config) return next();
 
     const now = new Date();

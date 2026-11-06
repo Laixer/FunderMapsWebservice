@@ -41,7 +41,7 @@ Request → Extract API key (2 methods) → Validate key in DB (60s cache) → R
 
 `POST /v4/mcp` (`src/mcp.ts`) builds one `McpServer` + `StreamableHTTPTransport` per request (stateless: no session id, `enableJsonResponse`, non-POST → 405). `authMiddleware` runs on the route so an unauthenticated caller gets the normal JSON 401. Each product tool **dispatches in-process** via `app.request("/v4/product/…/:id", { Authorization })` with the caller's own bearer — no duplicated SQL, and auth (60s cache hit), `rateLimit`, the product query and `trackerMiddleware` all run exactly as for a REST call, so billing is identical. Tool results: 200 → body as text + `structuredContent`; non-200 → `isError` with the route's `{ code, message }` (plus `Retry-After` on 429). `find_building` (postal code + house number → `geocoder.address` rows, indexed on `postal_code`) is the only SQL the file owns and is deliberately untracked. Tool catalogue and paths are pinned by `mcp.test.ts`; adding a product route means adding a row to `PRODUCT_TOOLS`.
 
-Each `/v4/product/*` route is wrapped in a `rateLimit(<trackerName>)` middleware that enforces a per-(API key, product) calendar-window limit against `application.api_key_rate_limit`. The unit is **billable events** (post-dedup `product_tracker` rows), not raw requests — same unit we bill on. Absent config row = unlimited. Overage returns 429 + `Retry-After` and emits a one-line JSON `rate_limit_exceeded` log for monitoring. See `src/rate-limit.ts` and issue #8.
+Each `/v4/product/*` route is wrapped in a `rateLimit(<trackerName>)` middleware that enforces a per-(organization, product) calendar-window limit from `application.organization_rate_limit`, shared by all of the organization's keys, counted from `application.product_tracker_count` (kept per UTC day by a trigger on `product_tracker`, so a check reads at most 31 rows). The unit is **billable events** (post-dedup `product_tracker` rows), not raw requests — same unit we bill on. Absent config row = unlimited. Overage returns 429 + `Retry-After` and emits a one-line JSON `rate_limit_exceeded` log for monitoring. See `src/rate-limit.ts` and issue #8.
 
 ### Source document link (`resource`)
 
@@ -131,7 +131,7 @@ src/
 ├── auth.ts         # API key middleware (Bearer only; dual-stack UNION ALL across auth_key + apikey)
 ├── geocoder.ts     # ID format detection + resolution functions
 ├── enums.ts        # Canonical enum label sets mirroring pg_enum; doc/db sync checked by enums.test.ts (issue #996)
-├── rate-limit.ts   # Per-(key, product) calendar-window rate limit middleware
+├── rate-limit.ts   # Per-(organization, product) calendar-window rate limit middleware
 ├── risk.ts         # Pure overallRisk computation for /v4/product/light
 ├── health.ts       # Readiness probe for /v4/health: cached, timeout-bounded SELECT 1
 ├── tracker.ts      # After-response product tracking middleware

@@ -4,7 +4,7 @@
 // thin wrapper around an existing /v4 route: the tool handler dispatches an
 // in-process request (Hono `app.request()`, no network hop) to the same route
 // with the caller's own `Authorization: Bearer` header. That means auth (and
-// its 60s cache), `product_tracker` billing, dedup and per-key rate limits all
+// its 60s cache), `product_tracker` billing, dedup and per-organization rate limits all
 // run exactly as they do for a REST call — an agent calling `get_analysis` is
 // indistinguishable from a curl to `/v4/product/analysis/:id` in the billing
 // data. No SQL is duplicated here; the only query this file owns is the
