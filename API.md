@@ -210,7 +210,7 @@ New codes may be added over time; treat any unlisted `code` on an error status g
 
 ### Rate limits
 
-Usage limits are set per API key and product as a number of billable events per calendar day or month (UTC). When a limit applies, every response to that product carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` (seconds until the window resets); an exhausted limit returns `429 rate_limit_exceeded` with `Retry-After`. Repeated requests for the same building within 24 hours do not consume additional events.
+Usage limits are set per organization and product, and shared by all of its API keys, as a number of billable events per calendar day or month (UTC). When a limit applies, every response to that product carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` (seconds until the window resets); an exhausted limit returns `429 rate_limit_exceeded` with `Retry-After`. Repeated requests for the same building within 24 hours do not consume additional events.
 
 ## 6. Every known building carries a risk indication
 
