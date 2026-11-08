@@ -60,7 +60,7 @@ No role checks. Key existence in either api-key table = authorized.
 
 Auth is **dual-stack** as of `72a11e3` (Phase B.2 of the apiKey migration):
 - `application.auth_key` — legacy keys hashed as SHA-256 hex.
-- `application.apikey` — Better Auth `@better-auth/api-key` plugin keys hashed as SHA-256 base64url (no padding). New keys created via the TS API's management routes land here.
+- `auth.apikey` — Better Auth `@better-auth/api-key` plugin keys hashed as SHA-256 base64url (no padding). New keys created via the TS API's management routes land here.
 
 `resolveKey` issues a single `UNION ALL` joining `organization_user` on both branches and returns at most one row (a plaintext only matches one table). The `source` column ("legacy" vs "ba") routes the fire-and-forget usage UPDATE to the right table. 60s in-memory cache per key (`AUTH_TTL_MS`); cache miss is the only time we hit the DB or bump usage. We deliberately don't pull in `better-auth` as a dependency on this billable surface — the BA hash format is reproduced inline (`sha256Base64Url`).
 
@@ -104,7 +104,7 @@ After-response middleware inserts into `application.product_tracker` with 24-hou
 - `data.model_risk_static` — main analysis view. Keyed by `building_id` (BAG, e.g. `NL.IMBAG.PAND.*`). `neighborhood_id` column holds the GFM neighborhood id. The analysis response returns it unchanged as `neighborhoodId` and adds `neighborhoodCode` (the CBS `BU*` code, a primary-key lookup on `geocoder.neighborhood`), so consumers can move before the gfm id is retired (FunderMapsWorker#158; no breaking change — the consumers that read it confirm first).
 - `data.statistics_product_*` — 9 statistics views (all keyed by GFM neighborhood_id or municipality_id)
 - `application.auth_key` — legacy API keys (SHA-256 hex hash of plaintext; `key_hash` + `user_id`; `last_used` bumped fire-and-forget on cache miss)
-- `application.apikey` — Better Auth plugin API keys (SHA-256 base64url-no-padding hash; `key` + `reference_id` (=user_id); `last_request` + `request_count` bumped on cache miss)
+- `auth.apikey` — Better Auth plugin API keys (SHA-256 base64url-no-padding hash; `key` + `reference_id` (=user_id); `last_request` + `request_count` bumped on cache miss)
 - `application.product_tracker` — usage tracking. `building_id` stores the resolved BAG id (typed `geocoder.geocoder_id`, FK to `geocoder.building.external_id`); `identifier` preserves the raw client-supplied id.
 - `geocoder.building` — id=GFM, external_id=BAG
 - `geocoder.neighborhood/district/municipality` — GFM IDs with CBS external_ids
