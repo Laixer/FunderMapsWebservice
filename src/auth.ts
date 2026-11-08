@@ -58,7 +58,7 @@ async function resolveKey(key: string): Promise<AuthResult | null> {
   //   every key issued before the @better-auth/api-key plugin landed.
   //   The C# Webservice that shared this table was retired 2026-08-29;
   //   the rows stay until customers have moved to fmsk keys.
-  // - application.apikey:     Better Auth's plugin table, SHA-256
+  // - auth.apikey:     Better Auth's plugin table, SHA-256
   //   base64url-no-padding hashes. New keys created via the TS API's
   //   management routes (Phase B.3) land here.
   //
@@ -80,12 +80,12 @@ async function resolveKey(key: string): Promise<AuthResult | null> {
   const rows = await sql`
     SELECT ak.id::text AS api_key_id, ak.user_id, ou.organization_id, 'legacy' AS source
     FROM application.auth_key ak
-    JOIN application.organization_user ou ON ou.user_id = ak.user_id
+    JOIN auth.organization_user ou ON ou.user_id = ak.user_id
     WHERE ak.key_hash = ${keyHashHex}
     UNION ALL
     SELECT ak.id AS api_key_id, ak.reference_id AS user_id, ou.organization_id, 'ba' AS source
-    FROM application.apikey ak
-    JOIN application.organization_user ou ON ou.user_id = ak.reference_id
+    FROM auth.apikey ak
+    JOIN auth.organization_user ou ON ou.user_id = ak.reference_id
     WHERE ak.key = ${keyHashB64Url}
       AND ak.enabled IS NOT FALSE
       AND (ak.expires_at IS NULL OR ak.expires_at > now())
@@ -99,7 +99,7 @@ async function resolveKey(key: string): Promise<AuthResult | null> {
   // tables on hot keys. Errors are non-fatal: usage tracking is
   // observability, not auth.
   if (rows[0]!.source === "ba") {
-    sql`UPDATE application.apikey
+    sql`UPDATE auth.apikey
         SET last_request = now(),
             request_count = COALESCE(request_count, 0) + 1
         WHERE key = ${keyHashB64Url}`.catch(() => {});
