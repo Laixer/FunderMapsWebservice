@@ -77,18 +77,31 @@ async function resolveKey(key: string): Promise<AuthResult | null> {
     sha256Hex(key),
     sha256Base64Url(key),
   ]);
+  // A key made on Mijn account (Studio #40) says which of its owner's organisations pays for it, in its metadata
+  // ({"organizationId": "…"}, as JSON text, or JSON text inside a JSON string). Such a key counts only for that
+  // organisation, and stops working when its owner leaves it, rather than quietly billing another. A key without one,
+  // like every key made before, resolves as it always did.
   const rows = await sql`
-    SELECT ak.id::text AS api_key_id, ak.user_id, ou.organization_id, 'legacy' AS source
-    FROM application.auth_key ak
-    JOIN auth.organization_user ou ON ou.user_id = ak.user_id
-    WHERE ak.key_hash = ${keyHashHex}
+    (SELECT ak.id::text AS api_key_id, ak.user_id, ou.organization_id, 'legacy' AS source
+     FROM application.auth_key ak
+     JOIN auth.organization_user ou ON ou.user_id = ak.user_id
+     WHERE ak.key_hash = ${keyHashHex}
+     LIMIT 1)
     UNION ALL
-    SELECT ak.id AS api_key_id, ak.reference_id AS user_id, ou.organization_id, 'ba' AS source
-    FROM auth.apikey ak
-    JOIN auth.organization_user ou ON ou.user_id = ak.reference_id
-    WHERE ak.key = ${keyHashB64Url}
-      AND ak.enabled IS NOT FALSE
-      AND (ak.expires_at IS NULL OR ak.expires_at > now())
+    (SELECT ak.id AS api_key_id, ak.reference_id AS user_id, ou.organization_id, 'ba' AS source
+     FROM auth.apikey ak
+     CROSS JOIN LATERAL (
+       SELECT CASE left(ltrim(ak.metadata), 1)
+         WHEN '{' THEN ak.metadata::jsonb ->> 'organizationId'
+         WHEN '"' THEN (ak.metadata::jsonb #>> '{}')::jsonb ->> 'organizationId'
+       END AS organization_id
+     ) chosen
+     JOIN auth.organization_user ou ON ou.user_id = ak.reference_id
+     WHERE ak.key = ${keyHashB64Url}
+       AND ak.enabled IS NOT FALSE
+       AND (ak.expires_at IS NULL OR ak.expires_at > now())
+       AND (chosen.organization_id IS NULL OR ou.organization_id::text = chosen.organization_id)
+     LIMIT 1)
     LIMIT 1
   `;
 
