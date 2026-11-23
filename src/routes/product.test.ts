@@ -179,17 +179,18 @@ describe("GET /risk/:id — 404 reason codes (issue #1002)", () => {
   });
 });
 
-// FunderMapsWorker#158: analysis carries the CBS buurtcode next to the
-// internal neighborhoodId, which stays unchanged until consumers have moved.
-describe("GET /analysis/:id — neighborhoodCode", () => {
+// FunderMapsWorker#158: since the area rekey neighborhoodId is the CBS buurtcode
+// itself. neighborhoodCode is its twin: the same value, kept for compatibility
+// until the next API version.
+describe("GET /analysis/:id — neighborhoodId and its twin neighborhoodCode", () => {
   const ANALYSIS_ROW = {
     buildingId: BAG,
-    neighborhoodId: "gfm-0123456789abcdef0123456789abcdef",
+    neighborhoodId: "BU05990110",
     neighborhoodCode: "BU05990110",
     foundationType: "wood",
   };
 
-  test("returns neighborhoodCode next to neighborhoodId", async () => {
+  test("returns the same CBS code in neighborhoodId and neighborhoodCode", async () => {
     queryRows = [ANALYSIS_ROW];
     const res = await product.request(`/analysis/${BAG}`);
     expect(res.status).toBe(200);
