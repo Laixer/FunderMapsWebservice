@@ -133,7 +133,7 @@ The complete field set of `GET /v4/product/analysis/{id}`. Nothing else is retur
 | Field | Type | Null share | Notes |
 |-------|------|-----------|-------|
 | `buildingId` | string | never | BAG pand id, e.g. `NL.IMBAG.PAND.0599100000369041` |
-| `neighborhoodId` | string | <0.1% | CBS buurtcode of the building's neighbourhood, `BU` + 8 digits, e.g. `BU05990110`. The official code is the id, as `buildingId` is the BAG pand id. Accepted as `{id}` by `/v4/product/statistics`. Before the move to official area codes this field held an internal FunderMaps id (`gfm-…`) |
+| `neighborhoodId` | string | <0.1% | CBS buurtcode of the building's neighbourhood, `BU` + 8 digits, e.g. `BU05990110`. The official code is the id, as `buildingId` is the BAG pand id. Accepted as `{id}` by `/v4/product/statistics`. Until 24 November 2026 this field held an internal FunderMaps id (`gfm-…`) |
 | `neighborhoodCode` | string | <0.1% | The same value as `neighborhoodId`. Kept for compatibility; it is removed in the next API version, so read `neighborhoodId` |
 | `constructionYear` | integer | <0.1% | Year, not a date |
 | `constructionYearReliability` | `reliability` | never | |

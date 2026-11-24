@@ -77,7 +77,7 @@ The `:id` parameter currently supports:
 
 CBS district (`WK*`) and CBS municipality (`GM*`) are deliberately not in `detectFormat` — the `/v4/product/statistics` endpoint is keyed by neighborhood, so adding these formats without an endpoint that consumes them would mean format-recognized inputs returning 404 from the lookup query (worse UX than the unknown-format 404 they get today). Reopen if a district/municipality-level product endpoint ships.
 
-GFM identifiers (`gfm-*`) are intentionally out of scope for v4 and return 404. The `gfm` branch in `detectFormat` is preserved so future GFM-aware paths can pattern-match against it; the corresponding lookup branches return null/404 by design.
+GFM identifiers (`gfm-*`) return 404 in v4. They were FunderMaps' own internal ids, and none is left in the tables this service reads: buildings and addresses are keyed by their BAG id, the area tables by their CBS code since the area rekey of 2026-11-24 (FunderMapsWorker#158). `detectFormat` still recognises the form, only so that such an input is refused the documented way; the lookup branches return null/404 by design.
 
 ### Error Contract
 
@@ -106,17 +106,17 @@ After-response middleware inserts into `application.product_tracker` with 24-hou
 - `application.auth_key` — legacy API keys (SHA-256 hex hash of plaintext; `key_hash` + `user_id`; `last_used` bumped fire-and-forget on cache miss)
 - `auth.apikey` — Better Auth plugin API keys (SHA-256 base64url-no-padding hash; `key` + `reference_id` (=user_id); `last_request` + `request_count` bumped on cache miss)
 - `application.product_tracker` — usage tracking. `building_id` stores the resolved BAG id (typed `geocoder.geocoder_id`, FK to `geocoder.building.external_id`); `identifier` preserves the raw client-supplied id.
-- `geocoder.building` — id=GFM, external_id=BAG
-- `geocoder.neighborhood/district/municipality` — GFM IDs with CBS external_ids
+- `geocoder.building` — keyed by `external_id`, the BAG pand id; the table has no `id` column
+- `geocoder.neighborhood/district/municipality/state` — `id` is the CBS code (`BU*`, `WK*`, `GM*`, `PV*`) since the area rekey; `external_id` holds the same value (a twin, to be dropped later) and `legacy_id` the id of before
 
 ### Important: ID Formats Across Schemas
 
 - `model_risk_static.building_id` = **BAG** external id (despite the unprefixed name). No `external_building_id` column exists.
-- `model_risk_static.neighborhood_id` = GFM internal id.
-- `statistics_product_*.neighborhood_id` = GFM internal id.
+- `model_risk_static.neighborhood_id` = CBS `BU*` code (since the area rekey, 2026-11-24).
+- `statistics_product_*.neighborhood_id` = CBS `BU*` code; `municipality_id` in the two municipality views = CBS `GM*` code.
 - `product_tracker.building_id` = BAG external id (FK to `geocoder.building.external_id`).
-- `geocoder.building.id` = GFM internal id; `geocoder.building.external_id` = BAG.
-- `geocoder.neighborhood.id` = GFM internal id; `geocoder.neighborhood.external_id` = CBS `BU*` code.
+- `geocoder.building.external_id` = BAG pand id, the table's key. There is no `geocoder.building.id`.
+- `geocoder.neighborhood.id` = CBS `BU*` code; `geocoder.neighborhood.external_id` = the same value.
 
 ## File Structure
 
