@@ -6,10 +6,10 @@ import {
   type RecoveryType,
 } from "./risk.ts";
 
-// computeOverallRisk powers /v4/product/light. Subtle priority rules —
-// reliability tier outranks raw risk letter — make this a likely place
-// for regressions to hide, so the cases below cover each rule the issue
-// pins down (#985).
+// computeOverallRisk powers /v4/product/light. The worst letter wins;
+// reliability only decides between components that share that letter.
+// The order was the other way round until 2026-11 (#985), so the cases
+// below pin each rule down.
 
 function cmp(
   risk: RiskComponent["risk"],
@@ -31,10 +31,10 @@ const cases: {
     expected: { risk: "c", reliability: "established" },
   },
   {
-    name: "established C beats indicative D (issue example: C vastgesteld > D indicatief)",
+    name: "the worst letter wins over a more reliable lower one (D indicative > C established)",
     components: [cmp("d", "indicative"), cmp("c", "established")],
     recovery: null,
-    expected: { risk: "c", reliability: "established" },
+    expected: { risk: "d", reliability: "indicative" },
   },
   {
     name: "within the same reliability, higher risk letter wins (E > D > C)",
@@ -47,7 +47,7 @@ const cases: {
     expected: { risk: "e", reliability: "cluster" },
   },
   {
-    name: "reliability rank: established > cluster > supercluster > indicative",
+    name: "on the same letter the most reliable wins: established > cluster > supercluster > indicative",
     components: [
       cmp("e", "indicative"),
       cmp("e", "supercluster"),
@@ -55,7 +55,19 @@ const cases: {
       cmp("e", "cluster"),
     ],
     recovery: null,
-    expected: { risk: "a", reliability: "established" },
+    expected: { risk: "e", reliability: "cluster" },
+  },
+  {
+    name: "established wins a tie on the worst letter",
+    components: [cmp("d", "cluster"), cmp("d", "established"), cmp("b", "established")],
+    recovery: null,
+    expected: { risk: "d", reliability: "established" },
+  },
+  {
+    name: "the order of the components does not matter",
+    components: [cmp("c", "established"), cmp("e", "indicative"), cmp("d", "cluster")],
+    recovery: null,
+    expected: { risk: "e", reliability: "indicative" },
   },
   {
     name: "supercluster beats indicative even on equal risk",
@@ -99,7 +111,7 @@ const cases: {
     expected: { risk: "d", reliability: "indicative" },
   },
   {
-    name: "real component outranks the indicative unclassified fallback (#1002)",
+    name: "a worse unclassified risk wins over a better established component",
     components: [
       cmp("c", "established"),
       cmp(null, null),
@@ -107,7 +119,18 @@ const cases: {
       cmp("d", "indicative"),
     ],
     recovery: null,
-    expected: { risk: "c", reliability: "established" },
+    expected: { risk: "d", reliability: "indicative" },
+  },
+  {
+    name: "a better unclassified risk does not lower the answer",
+    components: [
+      cmp("d", "cluster"),
+      cmp(null, null),
+      cmp(null, null),
+      cmp("b", "indicative"),
+    ],
+    recovery: null,
+    expected: { risk: "d", reliability: "cluster" },
   },
   {
     name: "recovery override beats any worse model risk",
