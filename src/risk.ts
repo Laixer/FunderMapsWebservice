@@ -12,6 +12,12 @@
 // other way round — reliability first, issue #985 — so a more reliable
 // lower letter could hide a less reliable higher one.)
 //
+// The unclassified risk has no reliability column of its own in the
+// model. It is not a guess: the model sets it from research on the
+// building, from a QuickScan, from a recovery, or carries it over from
+// the same block, and records which (`unclassified_source`). That
+// source decides its reliability here — see unclassifiedReliability.
+//
 // Override: if any recovery_type is known for this building (i.e. the
 // foundation has been restored), overall_risk is A regardless of the
 // model's component risks — a recovered building is the lowest risk
@@ -43,6 +49,26 @@ const RELIABILITY_RANK: Record<Reliability, number> = {
 };
 
 const RISK_RANK: Record<Risk, number> = { e: 5, d: 4, c: 3, b: 2, a: 1 };
+
+/**
+ * The reliability that goes with the unclassified risk, from where the
+ * model took it (data.model_risk_static_source.unclassified_source):
+ * research, a QuickScan or a recovery on the building itself is
+ * established; a class carried over from the block is cluster. A source
+ * this code does not know counts as indicative, the most careful label.
+ */
+export function unclassifiedReliability(source: string | null | undefined): Reliability {
+  switch (source) {
+    case "research":
+    case "quickscan":
+    case "herstel":
+      return "established";
+    case "cluster":
+      return "cluster";
+    default:
+      return "indicative";
+  }
+}
 
 export function computeOverallRisk(
   components: RiskComponent[],

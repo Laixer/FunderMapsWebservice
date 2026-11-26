@@ -241,6 +241,67 @@ describe("GET /light/:id", () => {
     expect(capturedQuery).toContain('AS "bioInfectionRisk"');
     expect(capturedQuery).toContain('AS "dewateringDepthRisk"');
   });
+
+  // The worst letter wins (Laixer/FunderMapsStudio#102), and the
+  // unclassified risk counts with the reliability of its source.
+  const light = async (row: Record<string, unknown>) => {
+    queryRows = [row];
+    const res = await product.request(`/light/${BAG}`);
+    expect(res.status).toBe(200);
+    return (await res.json()) as Record<string, unknown>;
+  };
+  const NO_RECOVERY = { ...LIGHT_ROW, recoveryType: null };
+
+  test("the source of the unclassified risk is read beside the model row", async () => {
+    await light(NO_RECOVERY);
+    expect(capturedQuery).toContain("data.model_risk_static_source");
+    expect(capturedQuery).toContain('AS "unclassifiedSource"');
+    expect(capturedQuery).toContain("WHERE m.building_id =");
+  });
+
+  test("without an unclassified risk the worst component letter is the answer", async () => {
+    expect(await light(NO_RECOVERY)).toEqual({ overallRisk: "c", overallRiskReliability: "established" });
+  });
+
+  test("a worse unclassified risk from research wins, as established", async () => {
+    expect(await light({ ...NO_RECOVERY, unclassifiedRisk: "e", unclassifiedSource: "research" })).toEqual({
+      overallRisk: "e",
+      overallRiskReliability: "established",
+    });
+  });
+
+  test("a worse unclassified risk from the block wins, as cluster", async () => {
+    expect(await light({ ...NO_RECOVERY, unclassifiedRisk: "d", unclassifiedSource: "cluster" })).toEqual({
+      overallRisk: "d",
+      overallRiskReliability: "cluster",
+    });
+  });
+
+  test("a worse unclassified risk without a known source wins, as indicative", async () => {
+    expect(await light({ ...NO_RECOVERY, unclassifiedRisk: "d", unclassifiedSource: null })).toEqual({
+      overallRisk: "d",
+      overallRiskReliability: "indicative",
+    });
+  });
+
+  test("a better unclassified risk does not lower the answer", async () => {
+    expect(await light({ ...NO_RECOVERY, unclassifiedRisk: "a", unclassifiedSource: "research" })).toEqual({
+      overallRisk: "c",
+      overallRiskReliability: "established",
+    });
+  });
+
+  test("on the same letter the more reliable component gives the reliability", async () => {
+    expect(
+      await light({
+        ...NO_RECOVERY,
+        drystandRisk: "d",
+        drystandRiskReliability: "indicative",
+        unclassifiedRisk: "d",
+        unclassifiedSource: "quickscan",
+      }),
+    ).toEqual({ overallRisk: "d", overallRiskReliability: "established" });
+  });
 });
 
 // Issue Laixer/FunderMapsApi#140: `resource` = signed link to the source

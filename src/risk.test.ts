@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import {
   computeOverallRisk,
+  unclassifiedReliability,
   type OverallRisk,
   type RiskComponent,
   type RecoveryType,
@@ -151,6 +152,23 @@ const cases: {
     expected: { risk: "a", reliability: "established" },
   },
 ];
+
+describe("unclassifiedReliability", () => {
+  test("research, a QuickScan and a recovery on the building are established", () => {
+    expect(unclassifiedReliability("research")).toBe("established");
+    expect(unclassifiedReliability("quickscan")).toBe("established");
+    expect(unclassifiedReliability("herstel")).toBe("established");
+  });
+  test("a class carried over from the block is cluster", () => {
+    expect(unclassifiedReliability("cluster")).toBe("cluster");
+  });
+  test("no source, or one this code does not know, is indicative", () => {
+    expect(unclassifiedReliability(null)).toBe("indicative");
+    expect(unclassifiedReliability(undefined)).toBe("indicative");
+    expect(unclassifiedReliability("build_year")).toBe("indicative");
+    expect(unclassifiedReliability("something new")).toBe("indicative");
+  });
+});
 
 describe("computeOverallRisk", () => {
   for (const { name, components, recovery, expected } of cases) {
