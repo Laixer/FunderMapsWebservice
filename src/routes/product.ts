@@ -87,10 +87,12 @@ product.get("/analysis/:id", rateLimit("analysis3"), async (c) => {
     SELECT
       building_id           AS "buildingId",
       neighborhood_id       AS "neighborhoodId",
-      -- The CBS buurtcode (BU + 8 digits) of the same neighbourhood. Added next
-      -- to the internal neighborhoodId so consumers can move to the public code
-      -- before the internal id is retired (FunderMapsWorker#158; no breaking
-      -- change, 2026-09-18). One primary-key lookup.
+      -- neighborhood_id IS the CBS buurtcode (BU + 8 digits) since the area rekey
+      -- (FunderMapsWorker#158): "neighborhoodId" is the field, as "buildingId"
+      -- is for the BAG id. "neighborhoodCode" carries the same code and stays
+      -- for compatibility until the next API version. It still comes from
+      -- geocoder.neighborhood (one primary-key lookup): make it the row's own
+      -- neighborhood_id before that table's external_id is ever dropped.
       (SELECT n.external_id FROM geocoder.neighborhood n WHERE n.id = m.neighborhood_id)
                             AS "neighborhoodCode",
       construction_year     AS "constructionYear",

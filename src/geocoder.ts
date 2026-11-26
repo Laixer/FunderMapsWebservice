@@ -138,8 +138,11 @@ export type NeighborhoodResolution =
   | { ok: false; reason: NeighborhoodResolutionFailure };
 
 /**
- * Resolve any identifier to a GFM neighborhood ID (used by statistics tables).
- * For CBS neighborhood codes, translates external_id → internal GFM id.
+ * Resolve any identifier to the neighbourhood id the statistics tables are
+ * keyed by. Since the area rekey (FunderMapsWorker#158) that id IS the CBS
+ * code, so for a CBS code the lookup only confirms the neighbourhood exists;
+ * it reads external_id, which holds the same value (read id instead before
+ * that column is ever dropped).
  * For building identifiers, looks up via model_risk_static; a miss there is
  * classified like the product endpoints classify it.
  */
