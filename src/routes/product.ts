@@ -12,6 +12,7 @@ import {
 import { rateLimit } from "../rate-limit.ts";
 import {
   computeOverallRisk,
+  unclassifiedReliability,
   type RecoveryType,
   type Reliability,
   type Risk,
@@ -191,9 +192,10 @@ product.get("/risk/:id", rateLimit("risk3"), async (c) => {
 
 // /v4/product/light — minimal output for fast chain integrations
 // (issue #985). overallRisk + overallRiskReliability are derived from
-// the three component risks plus the unclassified (construction-year
-// fallback) risk as an indicative-reliability component (issue #1002);
-// recoveryType overrides them to A,established.
+// the three component risks plus the unclassified risk: the worst
+// letter wins (src/risk.ts). The unclassified risk enters with the
+// reliability its source implies, read from the source view beside the
+// model view; recoveryType overrides them to A,established.
 // The component risks and restoration costs are inputs only, never
 // returned — the response is the single verdict (issue #1010).
 product.get("/light/:id", rateLimit("light3"), async (c) => {
@@ -204,16 +206,18 @@ product.get("/light/:id", rateLimit("light3"), async (c) => {
 
   const rows = await sql`
     SELECT
-      drystand_risk         AS "drystandRisk",
-      drystand_risk_reliability AS "drystandRiskReliability",
-      bio_infection_risk    AS "bioInfectionRisk",
-      bio_infection_risk_reliability AS "bioInfectionRiskReliability",
-      dewatering_depth_risk AS "dewateringDepthRisk",
-      dewatering_depth_risk_reliability AS "dewateringDepthRiskReliability",
-      unclassified_risk     AS "unclassifiedRisk",
-      recovery_type         AS "recoveryType"
-    FROM data.model_risk_static
-    WHERE building_id = ${externalId}
+      m.drystand_risk         AS "drystandRisk",
+      m.drystand_risk_reliability AS "drystandRiskReliability",
+      m.bio_infection_risk    AS "bioInfectionRisk",
+      m.bio_infection_risk_reliability AS "bioInfectionRiskReliability",
+      m.dewatering_depth_risk AS "dewateringDepthRisk",
+      m.dewatering_depth_risk_reliability AS "dewateringDepthRiskReliability",
+      m.unclassified_risk     AS "unclassifiedRisk",
+      s.unclassified_source   AS "unclassifiedSource",
+      m.recovery_type         AS "recoveryType"
+    FROM data.model_risk_static m
+    LEFT JOIN data.model_risk_static_source s ON s.building_id = m.building_id
+    WHERE m.building_id = ${externalId}
     LIMIT 1
   `;
 
@@ -233,18 +237,22 @@ product.get("/light/:id", rateLimit("light3"), async (c) => {
     dewateringDepthRisk: Risk | null;
     dewateringDepthRiskReliability: Reliability | null;
     unclassifiedRisk: Risk | null;
+    unclassifiedSource: string | null;
     recoveryType: RecoveryType | null;
   };
 
-  // unclassified_risk carries no reliability pair in the model; it's the
-  // construction-year fallback (issue #1002), so it enters as indicative —
-  // any real component outranks it on the reliability-first ordering.
+  // unclassified_risk carries no reliability pair in the model. It is a
+  // class from research, a QuickScan, a recovery or the block, and its
+  // source says which: that decides the reliability it enters with.
   const overall = computeOverallRisk(
     [
       { risk: row.drystandRisk, reliability: row.drystandRiskReliability },
       { risk: row.bioInfectionRisk, reliability: row.bioInfectionRiskReliability },
       { risk: row.dewateringDepthRisk, reliability: row.dewateringDepthRiskReliability },
-      { risk: row.unclassifiedRisk, reliability: "indicative" },
+      {
+        risk: row.unclassifiedRisk,
+        reliability: unclassifiedReliability(row.unclassifiedSource),
+      },
     ],
     row.recoveryType,
   );
